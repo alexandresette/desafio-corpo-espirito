@@ -1,0 +1,12 @@
+{
+  "name": "Desafio Corpo e Espírito",
+  "short_name": "Desafio GC",
+  "start_url": "./#/hoje",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F1E6",
+  "theme_color": "#2F3A26",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

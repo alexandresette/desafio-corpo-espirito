@@ -1,0 +1,585 @@
+// Desafio Corpo e Espírito · GC Samambaia · Lagoinha Valinhos
+(() => {
+  'use strict';
+
+  // ---------- regras do desafio ----------
+  const TZ = 'America/Sao_Paulo';
+  const START = '2026-10-19';
+  const TOTAL_DAYS = 28;
+  const MIN_MINUTES = 30;
+  const ACTIVITIES = ['Caminhada', 'Corrida', 'Academia', 'Outro'];
+  const DOUBLES = { 6: [6, 7], 13: [14, 15], 20: [22, 23] };
+  const PLAN = (() => {
+    const plan = [];
+    let ch = 1;
+    for (let d = 1; d <= TOTAL_DAYS; d++) {
+      if (DOUBLES[d]) { plan.push(DOUBLES[d]); ch += 2; } else { plan.push([ch]); ch++; }
+    }
+    return plan;
+  })();
+  const nviUrl = (ch) => `https://www.bible.com/pt/bible/129/PRO.${ch}.NVI`;
+
+  // ---------- datas ----------
+  const todayStr = () => new Date().toLocaleDateString('sv-SE', { timeZone: TZ });
+  const toUTC = (s) => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+  const todayIdx = () => Math.round((toUTC(todayStr()) - toUTC(START)) / 86400000) + 1;
+  const dateOf = (day) => new Date(toUTC(START) + (day - 1) * 86400000);
+  const WEEK = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const dayLabel = (day) => { const d = dateOf(day); return `${WEEK[d.getUTCDay()]}, ${d.getUTCDate()}/${MONTHS[d.getUTCMonth()]}`; };
+  const shortDate = (day) => { const d = dateOf(day); return `${d.getUTCDate()}/${MONTHS[d.getUTCMonth()]}`; };
+  const chaptersLabel = (day) => { const c = PLAN[day - 1]; return c.length > 1 ? `Provérbios ${c[0]} e ${c[1]}` : `Provérbios ${c[0]}`; };
+  // vale marcar o dia de hoje e o de ontem
+  const canMark = (day) => { const t = todayIdx(); return day >= 1 && day <= TOTAL_DAYS && (day === t || day === t - 1); };
+  const currentDay = () => Math.min(Math.max(todayIdx(), 1), TOTAL_DAYS);
+
+  // ---------- util ----------
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const app = $('#app');
+  const toast = (msg) => { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600); };
+  const sha256 = async (txt) => { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)); return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join(''); };
+  const pinHash = (id, pin) => sha256(`desafio-samambaia:${id}:${pin}`);
+  const onlyDigits = (el) => el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 4); });
+  const timeAgo = (iso) => {
+    const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (m < 1) return 'agora';
+    if (m < 60) return `${m} min`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `${h} h`;
+    return `${Math.round(h / 24)} d`;
+  };
+  const avatar = (p, size = 40) => p && p.photo_url
+    ? `<img class="av" src="${esc(p.photo_url)}" alt="" width="${size}" height="${size}" style="width:${size}px;height:${size}px" loading="lazy">`
+    : `<span class="av" style="width:${size}px;height:${size}px;display:inline-block"></span>`;
+  const ICON = {
+    back: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+    book: '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F6F1E6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/></svg>',
+    shoe: '<svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F6F1E6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16h14a4 4 0 0 0 4-4l-5-1-3-5-3 1 1 3-4 1-4-2z"/><path d="M3 16v2h18"/></svg>',
+    check: '<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#232B1C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    cam: '<svg aria-hidden="true" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#2F3A26" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    send: '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#232B1C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    out: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>'
+  };
+
+  // reduz a foto antes de subir (máx 1080px, jpeg)
+  const shrink = (file, max = 1080) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob((b) => b ? resolve(b) : reject(new Error('foto')), 'image/jpeg', 0.82);
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => reject(new Error('Não consegui abrir essa foto.'));
+    img.src = URL.createObjectURL(file);
+  });
+
+  // ---------- dados ----------
+  const cfg = window.CONFIG || {};
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+    app.classList.add('no-tabs');
+    app.innerHTML = '<div class="stack" style="padding-top:60px"><h1 style="font-size:40px">DESAFIO CORPO E ESPÍRITO</h1><p class="sub">O app está quase no ar. Falta configurar o banco de dados (config.js).</p></div>';
+    return;
+  }
+  const db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  const S = { people: [], checkins: [], comments: [], loaded: false };
+  const meId = () => { try { return localStorage.getItem('desafio_me'); } catch { return null; } };
+  const setMe = (id) => { try { id ? localStorage.setItem('desafio_me', id) : localStorage.removeItem('desafio_me'); } catch { /* sem storage */ } };
+  const me = () => S.people.find((p) => p.id === meId());
+  const person = (id) => S.people.find((p) => p.id === id);
+
+  async function load() {
+    const [p, c, m] = await Promise.all([
+      db.from('participants').select('id,name,photo_url,pin_hash,created_at').order('created_at'),
+      db.from('checkins').select('*').order('created_at', { ascending: false }),
+      db.from('comments').select('*').order('created_at')
+    ]);
+    const err = p.error || c.error || m.error;
+    if (err) throw err;
+    S.people = p.data; S.checkins = c.data; S.comments = m.data; S.loaded = true;
+  }
+
+  async function uploadPhoto(blob, folder) {
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const { error } = await db.storage.from('fotos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    if (error) throw error;
+    return db.storage.from('fotos').getPublicUrl(path).data.publicUrl;
+  }
+
+  const has = (pid, day, kind) => S.checkins.find((c) => c.participant_id === pid && c.day === day && c.kind === kind);
+  const fullDay = (pid, day) => has(pid, day, 'leitura') && has(pid, day, 'treino');
+
+  function scoreOf(pid) {
+    const mine = S.checkins.filter((c) => c.participant_id === pid);
+    const leituras = mine.filter((c) => c.kind === 'leitura').length;
+    const treinos = mine.filter((c) => c.kind === 'treino').length;
+    let full = 0;
+    for (let d = 1; d <= TOTAL_DAYS; d++) if (fullDay(pid, d)) full++;
+    // sequência: dias completos seguidos até hoje (ou até ontem, se hoje ainda está aberto)
+    let streak = 0;
+    let d = Math.min(todayIdx(), TOTAL_DAYS);
+    if (d >= 1 && !fullDay(pid, d)) d--;
+    while (d >= 1 && fullDay(pid, d)) { streak++; d--; }
+    return { pid, total: leituras + treinos, leituras, treinos, full, streak };
+  }
+  function ranking() {
+    return S.people.map((p) => scoreOf(p.id)).sort((a, b) => b.total - a.total || b.full - a.full || b.streak - a.streak);
+  }
+
+  // ---------- telas ----------
+  const routes = {};
+  const route = (name, fn) => { routes[name] = fn; };
+  const go = (h) => { if (location.hash === h) render(); else location.hash = h; };
+
+  function shell(withTabs, tab) {
+    $('#tabs').hidden = !withTabs;
+    app.classList.toggle('no-tabs', !withTabs);
+    $$('#tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
+  }
+
+  // --- entrar ---
+  route('entrar', () => {
+    shell(false);
+    let picked = null;
+    app.innerHTML = `
+      <div class="stack" style="padding-top:44px;gap:22px">
+        <div class="stack" style="gap:8px">
+          <div class="kicker">GC Samambaia · Lagoinha Valinhos</div>
+          <h1 style="font-size:54px">DESAFIO CORPO E ESPÍRITO</h1>
+          <div class="sub">19/out a 15/nov · Provérbios + 30 min de exercício por dia</div>
+        </div>
+        <a class="btn" href="#/cadastro">Primeira vez? Criar meu acesso</a>
+        ${S.people.length ? `
+        <div class="row small"><span class="grow" style="height:1px;background:var(--line-2)"></span>já participo<span class="grow" style="height:1px;background:var(--line-2)"></span></div>
+        <div class="stack" style="gap:10px">
+          <div class="section-title" style="font-size:15px;margin:0">Toque na sua foto</div>
+          <div class="people-grid">${S.people.map((p) => `<button class="person" data-id="${p.id}">${avatar(p, 52)}<span>${esc(p.name)}</span></button>`).join('')}</div>
+        </div>
+        <div id="pinBox" hidden>
+          <label class="lbl" for="pin" id="pinLbl">PIN</label>
+          <input class="input pin" id="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="••••">
+          <div class="err" id="pinErr" hidden>PIN errado. Tenta de novo.</div>
+          <div style="height:12px"></div>
+          <button class="btn outline" id="enter" disabled>Entrar</button>
+        </div>
+        <button class="link-btn" id="forgot">Esqueci meu PIN</button>` : ''}
+      </div>`;
+    $$('.person').forEach((b) => b.onclick = () => {
+      picked = person(b.dataset.id);
+      $$('.person').forEach((x) => x.classList.toggle('on', x === b));
+      $('#pinBox').hidden = false;
+      $('#pinLbl').textContent = `PIN de ${picked.name}`;
+      $('#pin').value = ''; $('#pinErr').hidden = true;
+      $('#pin').focus();
+    });
+    const pin = $('#pin');
+    if (!pin) return;
+    onlyDigits(pin);
+    const tryEnter = async () => {
+      if (!picked || pin.value.length !== 4) return;
+      const h = await pinHash(picked.id, pin.value);
+      if (h === picked.pin_hash) { setMe(picked.id); go('#/hoje'); }
+      else { $('#pinErr').hidden = false; pin.classList.add('bad'); pin.value = ''; }
+    };
+    pin.addEventListener('input', () => { $('#enter').disabled = pin.value.length !== 4; pin.classList.remove('bad'); if (pin.value.length === 4) tryEnter(); });
+    $('#enter').onclick = tryEnter;
+    $('#forgot').onclick = () => go('#/trocar-pin');
+  });
+
+  // --- cadastro ---
+  route('cadastro', () => {
+    shell(false);
+    let blob = null;
+    app.innerHTML = `
+      <div class="top"><a class="icon-btn" href="#/entrar" aria-label="Voltar">${ICON.back}</a><h1>CRIAR MEU ACESSO</h1></div>
+      <div class="stack" style="gap:16px;padding-top:6px">
+        <div class="stack center" style="gap:8px">
+          <button class="photo-pick" id="pick" aria-label="Adicionar sua foto">${ICON.cam}<span class="plus">+</span></button>
+          <input type="file" id="file" accept="image/*" hidden>
+          <div style="font-size:14px;font-weight:700">Sua foto <span style="color:var(--err)">(obrigatória)</span></div>
+          <div class="small" style="margin-top:-6px">Ela aparece no ranking e no calendário</div>
+        </div>
+        <div><label class="lbl" for="nome">Primeiro nome</label><input class="input" id="nome" maxlength="20" autocomplete="given-name" placeholder="Como o GC te chama"></div>
+        <div><label class="lbl" for="p1">Crie um PIN de 4 números</label><input class="input pin" id="p1" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="••••"></div>
+        <div><label class="lbl" for="p2">Confirme o PIN</label><input class="input pin" id="p2" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="••••"><div class="err" id="mismatch" hidden>Os dois PINs estão diferentes. Tenta de novo.</div></div>
+        <button class="btn" id="save" disabled>Entrar no desafio</button>
+        <div class="small center">O botão libera quando tiver foto, nome e PIN confirmado.</div>
+      </div>`;
+    const nome = $('#nome'), p1 = $('#p1'), p2 = $('#p2'), save = $('#save');
+    onlyDigits(p1); onlyDigits(p2);
+    const check = () => {
+      const mismatch = p2.value.length === 4 && p1.value !== p2.value;
+      $('#mismatch').hidden = !mismatch; p2.classList.toggle('bad', mismatch);
+      save.disabled = !(blob && nome.value.trim() && p1.value.length === 4 && p1.value === p2.value);
+    };
+    [nome, p1, p2].forEach((el) => el.addEventListener('input', check));
+    $('#pick').onclick = () => $('#file').click();
+    $('#file').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        blob = await shrink(f, 600);
+        $('#pick').innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="Sua foto">`;
+        check();
+      } catch (err) { toast(err.message); }
+    };
+    save.onclick = async () => {
+      const name = nome.value.trim();
+      if (S.people.some((p) => p.name.toLowerCase() === name.toLowerCase())) { toast(`Já tem um ${name} no desafio. Use o sobrenome junto.`); return; }
+      save.disabled = true; save.textContent = 'Criando…';
+      try {
+        const id = crypto.randomUUID();
+        const photo_url = await uploadPhoto(blob, 'perfil');
+        const pin_hash = await pinHash(id, p1.value);
+        const { error } = await db.from('participants').insert({ id, name, photo_url, pin_hash });
+        if (error) throw error;
+        setMe(id);
+        await load();
+        toast(`Bem-vindo, ${name}!`);
+        go('#/hoje');
+      } catch (err) {
+        console.error(err); toast('Não deu pra criar agora. Tenta de novo.');
+        save.disabled = false; save.textContent = 'Entrar no desafio';
+      }
+    };
+  });
+
+  // --- trocar pin ---
+  route('trocar-pin', () => {
+    shell(false);
+    let picked = null;
+    app.innerHTML = `
+      <div class="top"><a class="icon-btn" href="#/entrar" aria-label="Voltar">${ICON.back}</a><h1>TROCAR MEU PIN</h1></div>
+      <div class="stack" style="gap:16px;padding-top:6px">
+        <div class="section-title" style="font-size:15px;margin:0">1. Toque na sua foto</div>
+        <div class="people-grid">${S.people.map((p) => `<button class="person" data-id="${p.id}">${avatar(p, 46)}<span>${esc(p.name)}</span></button>`).join('')}</div>
+        <div><label class="lbl" for="n1">2. Crie um PIN novo</label><input class="input pin" id="n1" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="••••"></div>
+        <div><label class="lbl" for="n2">Confirme o PIN novo</label><input class="input pin" id="n2" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="••••"><div class="err" id="mismatch" hidden>Os dois PINs estão diferentes.</div></div>
+        <button class="btn" id="save" disabled>Salvar e entrar</button>
+        <div class="small center">Seus pontos e check-ins continuam todos aí.</div>
+      </div>`;
+    const n1 = $('#n1'), n2 = $('#n2'), save = $('#save');
+    onlyDigits(n1); onlyDigits(n2);
+    const check = () => {
+      const mismatch = n2.value.length === 4 && n1.value !== n2.value;
+      $('#mismatch').hidden = !mismatch; n2.classList.toggle('bad', mismatch);
+      save.disabled = !(picked && n1.value.length === 4 && n1.value === n2.value);
+    };
+    [n1, n2].forEach((el) => el.addEventListener('input', check));
+    $$('.person').forEach((b) => b.onclick = () => { picked = person(b.dataset.id); $$('.person').forEach((x) => x.classList.toggle('on', x === b)); check(); });
+    save.onclick = async () => {
+      save.disabled = true;
+      try {
+        const pin_hash = await pinHash(picked.id, n1.value);
+        const { error } = await db.from('participants').update({ pin_hash }).eq('id', picked.id);
+        if (error) throw error;
+        picked.pin_hash = pin_hash; setMe(picked.id);
+        toast('PIN trocado.'); go('#/hoje');
+      } catch (err) { console.error(err); toast('Não deu pra salvar. Tenta de novo.'); save.disabled = false; }
+    };
+  });
+
+  // --- hoje ---
+  function taskCards(day, pid) {
+    const l = has(pid, day, 'leitura'), t = has(pid, day, 'treino');
+    const c = PLAN[day - 1];
+    return `
+      <a class="task ${l ? 'done' : ''}" href="#/leitura/${day}">
+        <div class="ic">${l ? ICON.check : ICON.book}</div>
+        <div class="grow"><div class="t1">ESPÍRITO · ${l ? 'FEITO' : '1 PONTO'}</div><div class="t2">${chaptersLabel(day)}</div><div class="t3">${l ? 'Leitura marcada. Toque pra ver a conversa.' : (c.length > 1 ? 'Dia de capítulo duplo · NVI' : 'Nova Versão Internacional')}</div></div>
+        ${l ? '' : '<div class="go">Ler</div>'}
+      </a>
+      <a class="task ${t ? 'done' : ''}" href="#/treino/${day}">
+        <div class="ic">${t ? ICON.check : ICON.shoe}</div>
+        <div class="grow"><div class="t1">CORPO · ${t ? 'FEITO' : '1 PONTO'}</div><div class="t2">${t ? `${esc(t.activity)} · ${t.minutes} min` : `${MIN_MINUTES} min de exercício`}</div><div class="t3">${t ? 'Check-in com foto' : 'Caminhada, corrida, academia…'}</div></div>
+        ${t ? '' : '<div class="go">Check-in</div>'}
+      </a>`;
+  }
+  route('hoje', () => {
+    shell(true, 'hoje');
+    const m = me();
+    const t = todayIdx();
+    const sc = scoreOf(m.id);
+    const pos = ranking().findIndex((r) => r.pid === m.id) + 1;
+    let head, body = '';
+    if (t < 1) {
+      head = `<div class="sub" style="font-weight:600">Começa ${t === 0 ? 'amanhã' : `em ${1 - t} dias`}, segunda 19/out</div><h1 style="font-size:38px">QUASE LÁ</h1>`;
+      body = `<div class="card stack" style="gap:8px"><div style="font-weight:700">Você já está dentro, ${esc(m.name)}.</div><div class="sub">Amanhã aparecem aqui as duas tarefas do dia: ${chaptersLabel(1)} e ${MIN_MINUTES} min de exercício. Salve este app na tela inicial do celular pra achar fácil.</div></div>`;
+    } else if (t > TOTAL_DAYS) {
+      head = `<div class="sub" style="font-weight:600">Desafio encerrado em 15/nov</div><h1 style="font-size:38px">CHEGAMOS</h1>`;
+      body = `<div class="card stack" style="gap:8px"><div style="font-weight:700">Você fez ${sc.total} de ${TOTAL_DAYS * 2} pontos.</div><a class="btn" href="#/ranking">Ver o ranking final</a></div>`;
+    } else {
+      head = `<div class="sub" style="font-weight:600">${dayLabel(t)}</div><h1 style="font-size:36px">DIA ${t} DE ${TOTAL_DAYS}</h1>`;
+      const y = t - 1;
+      const yPending = y >= 1 && (!has(m.id, y, 'leitura') || !has(m.id, y, 'treino'));
+      const done = S.people.filter((p) => fullDay(p.id, t)).length;
+      body = `
+        <div class="section-title">Suas tarefas de hoje</div>
+        ${taskCards(t, m.id)}
+        ${yPending ? `<a class="pending" href="#/dia/${y}" style="text-decoration:none;color:var(--ink)"><b>Ontem ficou faltando.</b> Ainda dá tempo de marcar até meia-noite.</a>` : ''}
+        <div class="card stack" style="gap:12px">
+          <div class="row"><div class="grow" style="font-weight:700">Hoje no GC</div><div class="small">${done} de ${S.people.length} fecharam o dia</div></div>
+          <div class="row" style="flex-wrap:wrap;gap:8px">${S.people.map((p) => {
+            const f = fullDay(p.id, t);
+            return `<span title="${esc(p.name)}" style="border-radius:50%;outline:2.5px solid ${f ? 'var(--gold)' : 'transparent'};outline-offset:2px;${f ? '' : 'opacity:.45'}">${avatar(p, 34)}</span>`;
+          }).join('')}</div>
+        </div>`;
+    }
+    app.innerHTML = `
+      <div class="stack" style="padding-top:22px">
+        <div class="row"><div class="grow stack" style="gap:4px">${head}</div>
+          <button class="icon-btn" id="profile" aria-label="Minha conta" style="margin:0">${avatar(m, 44)}</button></div>
+        <div class="progress" aria-label="Progresso do desafio"><div style="width:${Math.max(0, Math.min(100, (t / TOTAL_DAYS) * 100))}%"></div></div>
+        <div class="stats">
+          <div class="stat"><b>${sc.total}</b><span>pontos</span></div>
+          <div class="stat"><b>${sc.streak}</b><span>dias seguidos</span></div>
+          <div class="stat"><b>${pos}º</b><span>no ranking</span></div>
+        </div>
+        ${body}
+      </div>`;
+    $('#profile').onclick = () => {
+      if (confirm(`Sair da conta de ${m.name} neste celular?`)) { setMe(null); go('#/entrar'); }
+    };
+  });
+
+  // --- dia (atalho pra marcar ontem) ---
+  route('dia', (day) => {
+    shell(true, 'hoje');
+    day = Number(day);
+    app.innerHTML = `
+      <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a><h1>DIA ${day} · ${shortDate(day).toUpperCase()}</h1></div>
+      <div class="stack" style="padding-top:6px">${taskCards(day, me().id)}</div>`;
+  });
+
+  // --- leitura ---
+  route('leitura', (day) => {
+    shell(true, 'hoje');
+    day = Number(day) || currentDay();
+    const m = me();
+    const done = has(m.id, day, 'leitura');
+    const open = canMark(day);
+    const chs = PLAN[day - 1];
+    const thread = S.comments.filter((c) => c.day === day);
+    app.innerHTML = `
+      <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a>
+        <div class="grow"><div class="kicker">DIA ${day} · ${dayLabel(day).toUpperCase()}${chs.length > 1 ? ' · DUPLO' : ''}</div><div style="font-size:18px;font-weight:700">${chaptersLabel(day)} · NVI</div></div></div>
+      <div class="stack" style="padding-top:8px">
+        ${chs.map((c) => `<a class="chapter-link" href="${nviUrl(c)}" target="_blank" rel="noopener"><div><div class="small">Abrir no app da Bíblia</div><b>Provérbios ${c}</b></div>${ICON.out}</a>`).join('')}
+        ${done
+          ? `<div class="card row" style="background:var(--olive);color:var(--cream)"><span style="width:36px;height:36px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center">${ICON.check}</span><div class="grow" style="font-weight:700">Leitura marcada</div></div>`
+          : open
+            ? `<button class="btn" id="markRead">${chs.length > 1 ? 'Li os dois capítulos' : 'Li o capítulo'}</button>`
+            : `<div class="small center">${day > todayIdx() ? 'Esse dia ainda não chegou.' : 'O prazo pra marcar esse dia já passou.'}</div>`}
+        <div class="row" style="margin-top:6px"><div class="grow section-title" style="margin:0">Conversa do dia</div><div class="small">${thread.length} ${thread.length === 1 ? 'comentário' : 'comentários'}</div></div>
+        <div class="stack" style="gap:10px">${thread.length ? thread.map((c) => {
+          const p = person(c.participant_id);
+          return `<div class="comment">${avatar(p, 32)}<div class="bubble"><b>${esc(p?.name || '?')}</b> <span class="small">· ${timeAgo(c.created_at)}</span><br>${esc(c.body)}</div></div>`;
+        }).join('') : '<div class="small">Ninguém comentou ainda. Que tal começar?</div>'}</div>
+        ${day <= Math.max(todayIdx(), 0) || open ? `
+        <div class="composer">
+          <label class="sr" for="cm">Seu comentário</label>
+          <textarea class="input grow" id="cm" rows="1" maxlength="1000" placeholder="O que falou com você hoje?"></textarea>
+          <button class="send" id="send" aria-label="Enviar comentário">${ICON.send}</button>
+        </div>` : ''}
+      </div>`;
+    const mark = $('#markRead');
+    if (mark) mark.onclick = async () => {
+      mark.disabled = true;
+      const { error } = await db.from('checkins').insert({ participant_id: m.id, day, kind: 'leitura' });
+      if (error && error.code !== '23505') { toast('Não deu pra marcar. Tenta de novo.'); mark.disabled = false; return; }
+      await load(); toast('+1 ponto. Agora conta pra gente o que te marcou.'); render();
+      setTimeout(() => $('#cm')?.focus(), 50);
+    };
+    const cm = $('#cm');
+    if (cm) {
+      cm.addEventListener('input', () => { cm.style.height = 'auto'; cm.style.height = Math.min(cm.scrollHeight, 160) + 'px'; });
+      $('#send').onclick = async () => {
+        const body = cm.value.trim(); if (!body) return;
+        $('#send').disabled = true;
+        const { error } = await db.from('comments').insert({ participant_id: m.id, day, body });
+        if (error) { toast('Não deu pra enviar.'); $('#send').disabled = false; return; }
+        await load(); render();
+      };
+    }
+  });
+
+  // --- treino ---
+  route('treino', (day) => {
+    shell(true, 'hoje');
+    day = Number(day) || currentDay();
+    const m = me();
+    const done = has(m.id, day, 'treino');
+    if (done) {
+      app.innerHTML = `
+        <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a><h1>TREINO DO DIA ${day}</h1></div>
+        <div class="post">${done.photo_url ? `<img class="ph" src="${esc(done.photo_url)}" alt="Foto do treino">` : ''}
+          <div class="body"><b>${esc(done.activity)} · ${done.minutes} min</b>${done.caption ? `<br>${esc(done.caption)}` : ''}</div></div>`;
+      return;
+    }
+    if (!canMark(day)) {
+      app.innerHTML = `<div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a><h1>TREINO</h1></div>
+        <p class="sub">${day > todayIdx() ? 'Esse dia ainda não chegou.' : 'O prazo pra marcar esse dia já passou.'}</p>`;
+      return;
+    }
+    let blob = null, activity = null, minutes = MIN_MINUTES;
+    app.innerHTML = `
+      <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a><h1>CHECK-IN DO TREINO</h1></div>
+      <div class="stack" style="padding-top:4px">
+        ${day !== todayIdx() ? `<div class="pending">Marcando o dia ${day} (${shortDate(day)}).</div>` : ''}
+        <button class="photo-big" id="pick">${ICON.cam}<span style="font-size:17px;font-weight:700">Tirar ou escolher foto</span><span class="small">Selfie, a esteira, o print do relógio, vale tudo</span></button>
+        <input type="file" id="file" accept="image/*" hidden>
+        <div class="section-title" style="font-size:15px;margin:0">O que você fez?</div>
+        <div class="chips">${ACTIVITIES.map((a) => `<button class="chip" data-a="${a}">${a}</button>`).join('')}</div>
+        <div class="section-title" style="font-size:15px;margin:0">Quanto tempo?</div>
+        <div class="stepper"><button id="minus" aria-label="Menos 5 minutos">−</button><div><b id="min">${minutes}</b> <span class="small">min</span></div><button id="plus" aria-label="Mais 5 minutos">+</button></div>
+        <div class="small" style="margin-top:-6px">Mínimo de ${MIN_MINUTES} min pra contar ponto.</div>
+        <div><label class="lbl" for="cap">Legenda (opcional)</label><input class="input" id="cap" maxlength="140" placeholder="5 km no parque antes do trabalho"></div>
+        <button class="btn" id="post" disabled>Postar check-in · +1 ponto</button>
+      </div>`;
+    const post = $('#post');
+    const check = () => { post.disabled = !(blob && activity && minutes >= MIN_MINUTES); };
+    $('#pick').onclick = () => $('#file').click();
+    $('#file').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try { blob = await shrink(f); const b = $('#pick'); b.classList.add('has'); b.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="Foto do treino">`; check(); }
+      catch (err) { toast(err.message); }
+    };
+    $$('.chip').forEach((c) => c.onclick = () => { activity = c.dataset.a; $$('.chip').forEach((x) => x.classList.toggle('on', x === c)); check(); });
+    $('#minus').onclick = () => { minutes = Math.max(MIN_MINUTES, minutes - 5); $('#min').textContent = minutes; };
+    $('#plus').onclick = () => { minutes = Math.min(300, minutes + 5); $('#min').textContent = minutes; };
+    post.onclick = async () => {
+      post.disabled = true; post.textContent = 'Enviando…';
+      try {
+        const photo_url = await uploadPhoto(blob, 'treinos');
+        const { error } = await db.from('checkins').insert({ participant_id: m.id, day, kind: 'treino', activity, minutes, photo_url, caption: $('#cap').value.trim() || null });
+        if (error && error.code !== '23505') throw error;
+        await load(); toast('+1 ponto. Bom treino!'); go('#/hoje');
+      } catch (err) { console.error(err); toast('Não deu pra postar. Tenta de novo.'); post.disabled = false; post.textContent = 'Postar check-in · +1 ponto'; }
+    };
+  });
+
+  // --- mural ---
+  route('mural', () => {
+    shell(true, 'mural');
+    const items = [
+      ...S.checkins.filter((c) => c.kind === 'treino').map((c) => ({ ...c, type: 'treino' })),
+      ...S.comments.map((c) => ({ ...c, type: 'comentario' }))
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 80);
+    app.innerHTML = `
+      <div class="stack" style="padding-top:22px">
+        <h1 style="font-size:36px">MURAL</h1>
+        ${items.length ? items.map((it) => {
+          const p = person(it.participant_id);
+          if (it.type === 'treino') return `
+            <div class="post">
+              <div class="head">${avatar(p, 36)}<div class="grow"><b>${esc(p?.name)}</b><div class="small">${esc(it.activity)} · ${it.minutes} min · dia ${it.day}</div></div><span class="small">${timeAgo(it.created_at)}</span></div>
+              ${it.photo_url ? `<img class="ph" src="${esc(it.photo_url)}" alt="Treino de ${esc(p?.name)}" loading="lazy">` : ''}
+              ${it.caption ? `<div class="body">${esc(it.caption)}</div>` : ''}
+            </div>`;
+          return `
+            <a class="card" href="#/leitura/${it.day}" style="text-decoration:none;color:var(--ink);display:flex;gap:10px">
+              ${avatar(p, 36)}<div class="grow"><div class="row"><b class="grow">${esc(p?.name)}</b><span class="small">${timeAgo(it.created_at)}</span></div>
+              <div class="kicker" style="margin:2px 0 4px">${chaptersLabel(it.day)}</div><div style="font-size:15px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${esc(it.body)}</div></div>
+            </a>`;
+        }).join('') : '<div class="card sub">Os treinos e comentários do grupo vão aparecer aqui.</div>'}
+      </div>`;
+    $$('img.ph').forEach((img) => img.onclick = () => zoom(img.src));
+  });
+
+  // --- ranking ---
+  route('ranking', () => {
+    shell(true, 'ranking');
+    const r = ranking();
+    const m = me();
+    const max = Math.max(0, Math.min(todayIdx(), TOTAL_DAYS)) * 2;
+    const top = r.slice(0, 3);
+    const order = [top[1], top[0], top[2]];
+    const heights = [64, 84, 50], sizes = [52, 60, 48], labels = ['2º', '1º', '3º'];
+    app.innerHTML = `
+      <div class="hero">
+        <div class="row"><h1 class="grow" style="font-size:36px">RANKING</h1><span class="small" style="color:var(--line-2)">máximo até hoje: ${max} pts</span></div>
+        ${r.length ? `<div class="podium">${order.map((s, i) => s ? `
+          <div class="p">${avatar(person(s.pid), sizes[i])}<div class="nm">${esc(person(s.pid).name)}</div>
+            <div class="base" style="height:${heights[i]}px"><b>${s.total}</b><span>${labels[i]}</span></div></div>` : '<div></div>').join('')}</div>` : ''}
+      </div>
+      <div class="stack" style="gap:8px;padding-top:16px">
+        ${r.slice(3).map((s, i) => {
+          const p = person(s.pid);
+          return `<div class="rank-row ${s.pid === m.id ? 'me' : ''}"><div class="pos">${i + 4}º</div>${avatar(p, 36)}
+            <div class="grow"><div style="font-weight:700">${esc(p.name)}</div><div class="small">${s.leituras} leituras · ${s.treinos} treinos</div></div><div class="pts">${s.total}</div></div>`;
+        }).join('')}
+        <div class="small center" style="padding-top:4px">Empate se resolve por dias completos e depois pela sequência.</div>
+      </div>`;
+  });
+
+  // --- calendário ---
+  route('calendario', (sel) => {
+    shell(true, 'calendario');
+    const t = todayIdx();
+    sel = Number(sel) || currentDay();
+    const n = S.people.length || 1;
+    const cells = [];
+    for (let d = 1; d <= TOTAL_DAYS; d++) {
+      const date = dateOf(d);
+      const full = S.people.filter((p) => fullDay(p.id, d)).length;
+      const ratio = full / n;
+      const past = d <= t;
+      const lvl = !past ? '' : ratio >= 0.75 ? 'l3' : ratio >= 0.4 ? 'l2' : 'l1';
+      const sub = DOUBLES[d] ? '2×' : past ? `${full}/${S.people.length}` : '';
+      cells.push(`<button class="${lvl} ${d === sel ? 'sel' : ''} ${d === t ? 'today' : ''}" data-d="${d}" aria-label="Dia ${d}, ${shortDate(d)}"><b>${date.getUTCDate()}</b><i>${sub}</i></button>`);
+    }
+    const rows = S.people.map((p) => {
+      const l = has(p.id, sel, 'leitura'), tr = has(p.id, sel, 'treino');
+      return `<div class="day-row">${avatar(p, 30)}<div class="grow" style="font-weight:600;font-size:14px">${esc(p.name)}</div>
+        <span class="tag ${l ? 'on' : ''}">Leitura</span>
+        ${tr && tr.photo_url ? `<button class="tag on" data-ph="${esc(tr.photo_url)}">${esc(tr.activity)}</button>` : `<span class="tag ${tr ? 'on' : ''}">${tr ? esc(tr.activity) : 'Treino'}</span>`}</div>`;
+    }).join('');
+    const fullCount = S.people.filter((p) => fullDay(p.id, sel)).length;
+    app.innerHTML = `
+      <div class="stack" style="padding-top:22px;gap:12px">
+        <div class="row"><h1 class="grow" style="font-size:36px">CALENDÁRIO</h1><span class="small">19/out a 15/nov</span></div>
+        <div class="card stack" style="gap:10px;padding:14px">
+          <div class="cal">${['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((w) => `<div class="wd">${w}</div>`).join('')}${cells.join('')}</div>
+          <div class="legend"><span><i style="background:var(--olive)"></i>quase todos</span><span><i style="background:var(--sage)"></i>metade</span><span><i style="background:var(--line)"></i>poucos</span><span>2× = capítulo duplo</span></div>
+        </div>
+        <div class="row" style="padding-top:4px"><div class="grow" style="font-weight:700">${dayLabel(sel)} · ${chaptersLabel(sel)}</div></div>
+        <div class="small" style="margin-top:-8px">${sel <= t ? `${fullCount} de ${S.people.length} completaram` : 'Ainda não chegou'}</div>
+        <div class="stack" style="gap:6px">${rows || '<div class="small">Ninguém entrou ainda.</div>'}</div>
+      </div>`;
+    $$('.cal button').forEach((b) => b.onclick = () => go(`#/calendario/${b.dataset.d}`));
+    $$('[data-ph]').forEach((b) => b.onclick = () => zoom(b.dataset.ph));
+  });
+
+  function zoom(src) {
+    const m = document.createElement('div');
+    m.className = 'modal'; m.innerHTML = `<img src="${esc(src)}" alt="Foto ampliada">`;
+    m.onclick = () => m.remove();
+    document.body.appendChild(m);
+  }
+
+  // ---------- roteador ----------
+  const PUBLIC = ['entrar', 'cadastro', 'trocar-pin'];
+  function render() {
+    const [name = '', arg] = location.hash.replace(/^#\/?/, '').split('/');
+    let target = routes[name] ? name : (me() ? 'hoje' : 'entrar');
+    if (!PUBLIC.includes(target) && !me()) target = 'entrar';
+    if (target === 'entrar' && me()) target = 'hoje';
+    window.scrollTo(0, 0);
+    routes[target](arg);
+  }
+  window.addEventListener('hashchange', render);
+  // atualiza quando o app volta pra frente (ex.: alguém postou enquanto estava fechado)
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible' || !S.loaded) return;
+    const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+    try { await load(); if (!typing) render(); } catch { /* sem rede */ }
+  });
+
+  load().then(render).catch((err) => {
+    console.error(err);
+    app.innerHTML = '<div class="stack" style="padding-top:60px"><h1 style="font-size:36px">SEM CONEXÃO</h1><p class="sub">Não consegui carregar o desafio. Confere a internet e recarrega a página.</p><button class="btn" onclick="location.reload()">Tentar de novo</button></div>';
+  });
+})();

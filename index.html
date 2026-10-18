@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2F3A26">
+<title>Desafio Corpo e Espírito · GC Samambaia</title>
+<meta name="description" content="28 dias de Provérbios e exercício. GC Samambaia · Lagoinha Valinhos.">
+<meta property="og:title" content="Desafio Corpo e Espírito">
+<meta property="og:description" content="28 dias de Provérbios e exercício. GC Samambaia · Lagoinha Valinhos.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app"><div class="loading">Carregando…</div></main>
+<nav id="tabs" hidden>
+  <a href="#/hoje" data-tab="hoje">Hoje</a>
+  <a href="#/mural" data-tab="mural">Mural</a>
+  <a href="#/ranking" data-tab="ranking">Ranking</a>
+  <a href="#/calendario" data-tab="calendario">Calendário</a>
+</nav>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
