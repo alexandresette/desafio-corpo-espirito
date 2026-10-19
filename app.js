@@ -1,6 +1,10 @@
 // Desafio Corpo e Espírito · GC Samambaia · Lagoinha Valinhos
 (() => {
   'use strict';
+  // versão deste arquivo (app.js?v=N), usada pra se atualizar sozinho
+  const MY_V = ((document.currentScript && /[?&]v=(\d+)/.exec(document.currentScript.src)) || [])[1] || null;
+  // rascunhos que sobrevivem se a tela for recriada (ex.: voltar da galeria)
+  const DRAFT = { signup: null, treino: null, nome: '' };
 
   // ---------- regras do desafio ----------
   const TZ = 'America/Sao_Paulo';
@@ -343,7 +347,6 @@
   // --- cadastro ---
   route('cadastro', () => {
     shell(false);
-    let blob = null;
     app.innerHTML = `
       <div class="top"><a class="icon-btn" href="#/entrar" aria-label="Voltar">${ICON.back}</a><h1>CRIAR MEU ACESSO</h1></div>
       <div class="stack" style="gap:16px;padding-top:6px">
@@ -363,7 +366,11 @@
       </div>`;
     const nome = $('#nome'), p1 = $('#p1'), p2 = $('#p2'), save = $('#save');
     onlyDigits(p1); onlyDigits(p2);
+    if (DRAFT.signup) $('#pick').innerHTML = DRAFT.signup.prev + '<span class="plus">+</span>';
+    if (DRAFT.nome) nome.value = DRAFT.nome;
+    nome.addEventListener('input', () => { DRAFT.nome = nome.value; });
     const check = () => {
+      const blob = DRAFT.signup && DRAFT.signup.blob;
       const mismatch = p2.value.length === 4 && p1.value !== p2.value;
       $('#mismatch').hidden = !mismatch; p2.classList.toggle('bad', mismatch);
       const falta = [];
@@ -375,40 +382,42 @@
       $('#missing').textContent = falta.length ? `Falta: ${falta.join(', ').replace(/, ([^,]*)$/, ' e $1')}.` : 'Tudo certo, pode entrar.';
     };
     [nome, p1, p2].forEach((el) => el.addEventListener('input', check));
+    DRAFT.recheck = check; check();
     $('#pick').onclick = () => $('#file').click();
     $('#file').onchange = async (e) => {
       const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
-      const pe = $('#photoErr'); pe.hidden = true;
+      $('#photoErr').hidden = true;
       $('#pick').innerHTML = '<span class="small">Abrindo…</span>';
       try {
         const r = await pickPhoto(f, { aspect: 1, round: true, outW: 600 });
-        if (!r) { $('#pick').innerHTML = (blob ? $('#pick').dataset.prev : ICON.cam) + '<span class="plus">+</span>'; return; }
-        blob = r.blob;
-        const prev = photoPreview(r); $('#pick').dataset.prev = prev;
-        $('#pick').innerHTML = prev + '<span class="plus">+</span>';
-        check();
+        if (r) DRAFT.signup = { blob: r.blob, prev: photoPreview(r) };
       } catch (err) {
-        blob = null; check();
-        $('#pick').innerHTML = ICON.cam + '<span class="plus">+</span>';
-        pe.textContent = err.message; pe.hidden = false;
+        const pe = $('#photoErr'); if (pe) { pe.textContent = err.message; pe.hidden = false; }
       }
+      // sempre pinta a tela atual, mesmo que ela tenha sido recriada nesse meio tempo
+      const pk = $('#pick');
+      if (pk) pk.innerHTML = (DRAFT.signup ? DRAFT.signup.prev : ICON.cam) + '<span class="plus">+</span>';
+      if (DRAFT.recheck) DRAFT.recheck();
     };
     save.onclick = async () => {
       const name = nome.value.trim();
       if (S.people.some((p) => p.name.toLowerCase() === name.toLowerCase())) { toast(`Já tem um ${name} no desafio. Use o sobrenome junto.`); return; }
       save.disabled = true; save.textContent = 'Criando…';
       try {
-        const id = crypto.randomUUID();
-        const photo_url = await uploadPhoto(blob, 'perfil');
+        const id = (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+          const r = (crypto.getRandomValues(new Uint8Array(1))[0] & 15); return (ch === 'x' ? r : (r & 3) | 8).toString(16);
+        }));
+        const photo_url = await uploadPhoto(DRAFT.signup.blob, 'perfil');
         const pin_hash = await pinHash(id, p1.value);
         const { error } = await db.from('participants').insert({ id, name, photo_url, pin_hash });
         if (error) throw error;
-        setMe(id);
+        setMe(id); DRAFT.signup = null; DRAFT.nome = '';
         await load();
         toast(`Bem-vindo, ${name}!`);
         go('#/hoje');
       } catch (err) {
-        console.error(err); toast('Não deu pra criar agora. Tenta de novo.');
+        console.error(err);
+        $('#missing').textContent = 'Não deu pra criar agora. Confere a internet e tenta de novo.' + (err && err.message ? ` (${err.message})` : '');
         save.disabled = false; save.textContent = 'Entrar no desafio';
       }
     };
@@ -602,7 +611,9 @@
         <p class="sub">${day > todayIdx() ? 'Esse dia ainda não chegou.' : 'O prazo pra marcar esse dia já passou.'}</p>`;
       return;
     }
-    let blob = null, activity = null, minutes = MIN_MINUTES;
+    let activity = null, minutes = MIN_MINUTES;
+    if (DRAFT.treino && DRAFT.treino.day !== day) DRAFT.treino = null;
+    const tblob = () => DRAFT.treino && DRAFT.treino.blob;
     app.innerHTML = `
       <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a><h1>CHECK-IN DO TREINO</h1></div>
       <div class="stack" style="padding-top:4px">
@@ -618,17 +629,21 @@
         <button class="btn" id="post" disabled>Postar check-in · +1 ponto</button>
       </div>`;
     const post = $('#post');
-    const check = () => { post.disabled = !(blob && activity && minutes >= MIN_MINUTES); };
+    const check = () => { post.disabled = !(tblob() && activity && minutes >= MIN_MINUTES); };
+    if (DRAFT.treino) { const b0 = $('#pick'); b0.classList.toggle('has', !DRAFT.treino.original); b0.innerHTML = DRAFT.treino.prev; }
+    DRAFT.recheckT = check;
     $('#pick').onclick = () => $('#file').click();
     $('#file').onchange = async (e) => {
       const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
       const b = $('#pick'); b.innerHTML = '<span class="small">Abrindo…</span>';
       try {
         const r = await pickPhoto(f, { aspect: 4 / 5, outW: 900 });
-        if (!r) { b.innerHTML = blob ? b.dataset.prev : `${ICON.cam}<span style="font-size:17px;font-weight:700">Tirar ou escolher foto</span>`; return; }
-        blob = r.blob; b.classList.toggle('has', !r.original); b.dataset.prev = photoPreview(r); b.innerHTML = b.dataset.prev; check();
+        if (r) DRAFT.treino = { day, blob: r.blob, prev: photoPreview(r), original: r.original };
+        const bb = $('#pick');
+        if (bb) { bb.classList.toggle('has', !!DRAFT.treino && !DRAFT.treino.original); bb.innerHTML = DRAFT.treino ? DRAFT.treino.prev : `${ICON.cam}<span style="font-size:17px;font-weight:700">Tirar ou escolher foto</span>`; }
+        if (DRAFT.recheckT) DRAFT.recheckT();
       }
-      catch (err) { blob = null; check(); b.classList.remove('has'); b.innerHTML = `${ICON.cam}<span style="font-size:15px;font-weight:700;color:var(--err);padding:0 16px;text-align:center">${esc(err.message)}</span>`; }
+      catch (err) { DRAFT.treino = null; check(); b.classList.remove('has'); b.innerHTML = `${ICON.cam}<span style="font-size:15px;font-weight:700;color:var(--err);padding:0 16px;text-align:center">${esc(err.message)}</span>`; }
     };
     $$('.chip').forEach((c) => c.onclick = () => { activity = c.dataset.a; $$('.chip').forEach((x) => x.classList.toggle('on', x === c)); check(); });
     $('#minus').onclick = () => { minutes = Math.max(MIN_MINUTES, minutes - 5); $('#min').textContent = minutes; };
@@ -636,9 +651,10 @@
     post.onclick = async () => {
       post.disabled = true; post.textContent = 'Enviando…';
       try {
-        const photo_url = await uploadPhoto(blob, 'treinos');
+        const photo_url = await uploadPhoto(tblob(), 'treinos');
         const { error } = await db.from('checkins').insert({ participant_id: m.id, day, kind: 'treino', activity, minutes, photo_url, caption: $('#cap').value.trim() || null });
         if (error && error.code !== '23505') throw error;
+        DRAFT.treino = null;
         await load(); toast('+1 ponto. Bom treino!'); go('#/hoje');
       } catch (err) { console.error(err); toast('Não deu pra postar. Tenta de novo.'); post.disabled = false; post.textContent = 'Postar check-in · +1 ponto'; }
     };
@@ -1013,6 +1029,24 @@
     if (!safe || busy || !me()) return;
     try { await load(); if (!document.querySelector('.cropper')) render(); } catch { /* sem rede */ }
   });
+
+  // confere se saiu versão nova do app e recarrega (só fora de formulários)
+  async function checkUpdate(force) {
+    if (!MY_V) return false;
+    try {
+      const html = await fetch(location.pathname + '?u=' + Date.now(), { cache: 'no-store' }).then((r) => r.text());
+      const v = (/app\.js\?v=(\d+)/.exec(html) || [])[1];
+      if (v && v !== MY_V) {
+        const name = location.hash.replace(/^#\/?/, '').split('/')[0] || 'hoje';
+        const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+        const formOpen = document.querySelector('.cropper') || DRAFT.signup || DRAFT.treino || ['cadastro', 'treino', 'trocar-pin'].includes(name) || (name === 'leitura' && typing);
+        if (force || !formOpen) { location.replace(location.pathname + '?v=' + v + location.hash); return true; }
+      }
+    } catch { /* sem rede */ }
+    return false;
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(false); });
+  checkUpdate(true);
 
   load().then(render).catch((err) => {
     console.error(err);
