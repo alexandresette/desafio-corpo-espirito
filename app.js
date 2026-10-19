@@ -837,6 +837,7 @@
         <div class="row"><h1 class="grow" style="font-size:36px">RANKING</h1><span class="small" style="color:var(--line-2)">máximo até hoje: ${max} pts</span></div>
         ${r.length ? `<div class="podium">${order.map((s, i) => s ? `
           <div class="p">${avatar(person(s.pid), sizes[i])}<div class="nm">${esc(person(s.pid).name)}</div>
+            <div class="split">${s.leituras} ${s.leituras === 1 ? 'leitura' : 'leituras'}<br>${s.treinos} ${s.treinos === 1 ? 'treino' : 'treinos'}</div>
             <div class="base" style="height:${heights[i]}px"><b>${s.total}</b><span>${labels[i]}</span></div></div>` : '<div></div>').join('')}</div>` : ''}
       </div>
       <div class="stack" style="gap:8px;padding-top:16px">
