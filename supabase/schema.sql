@@ -48,3 +48,14 @@ on conflict (id) do nothing;
 
 create policy "fotos leitura" on storage.objects for select to anon using (bucket_id = 'fotos');
 create policy "fotos envio" on storage.objects for insert to anon with check (bucket_id = 'fotos');
+
+-- Curtidas nos comentários
+create table if not exists likes (
+  comment_id uuid not null references comments(id) on delete cascade,
+  participant_id uuid not null references participants(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, participant_id)
+);
+alter table likes enable row level security;
+create policy "aberto" on likes for all to anon using (true) with check (true);
+grant select, insert, delete on likes to anon;

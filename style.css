@@ -198,3 +198,17 @@ button.tag { border: 0; cursor: pointer; }
 #tabs a.on { color: var(--olive); }
 #tabs a:not(.on) svg { stroke: var(--muted-2); }
 .crop-box .photo-pick { flex-shrink: 0; }
+
+/* mural por dia, curtidas */
+.daybar { display: flex; align-items: center; gap: 6px; background: var(--paper); border-radius: 18px; padding: 8px; }
+.daybar b { font-size: 15px; }
+.daybar .icon-btn { color: var(--olive); width: 48px; height: 48px; background: var(--sand); border-radius: 14px; }
+.daybar .icon-btn.off { opacity: .3; }
+.like { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: var(--muted-2); font-weight: 700; font-size: 13px; min-height: 36px; min-width: 44px; padding: 0 6px; cursor: pointer; border-radius: 10px; }
+.like svg { fill: none; }
+.like.on { color: #B5453A; }
+.like.on svg { fill: #B5453A; }
+.bubble-foot { display: flex; justify-content: flex-end; margin: 2px -6px -6px 0; }
+.comment-card.destaque { background: #F3E3C6; }
+.com-body { display: block; color: var(--ink); text-decoration: none; font-size: 15px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
+.btn.gold svg { stroke: var(--ink); }

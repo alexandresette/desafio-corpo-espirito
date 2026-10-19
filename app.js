@@ -64,6 +64,9 @@
     cam: '<svg aria-hidden="true" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#2F3A26" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
     send: '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#232B1C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
     out: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>',
+    heart: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+    next: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
+    share: '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v8h14v-8"/></svg>',
     x: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'
   };
 
@@ -207,15 +210,46 @@
   const person = (id) => S.people.find((p) => p.id === id);
 
   async function load() {
-    const [p, c, m] = await Promise.all([
+    const [p, c, m, l] = await Promise.all([
       db.from('participants').select('id,name,photo_url,pin_hash,created_at').order('created_at'),
       db.from('checkins').select('*').order('created_at', { ascending: false }),
-      db.from('comments').select('*').order('created_at')
+      db.from('comments').select('*').order('created_at'),
+      db.from('likes').select('comment_id,participant_id')
     ]);
     const err = p.error || c.error || m.error;
     if (err) throw err;
-    S.people = p.data; S.checkins = c.data; S.comments = m.data; S.loaded = true;
+    S.people = p.data; S.checkins = c.data; S.comments = m.data; S.likes = l.error ? [] : l.data; S.loaded = true;
   }
+
+  // ---------- curtidas ----------
+  const likesOf = (cid) => (S.likes || []).filter((x) => x.comment_id === cid);
+  const likedByMe = (cid) => likesOf(cid).some((x) => x.participant_id === meId());
+  const likeBtn = (cid) => {
+    const n = likesOf(cid).length, on = likedByMe(cid);
+    return `<button class="like${on ? ' on' : ''}" type="button" data-like="${cid}" aria-pressed="${on}" aria-label="${on ? 'Descurtir' : 'Curtir'} comentário">${ICON.heart}<span>${n || ''}</span></button>`;
+  };
+  // comentário mais curtido do dia (empate: o mais antigo)
+  const topComment = (day) => S.comments.filter((c) => c.day === day)
+    .map((c) => ({ c, n: likesOf(c.id).length }))
+    .sort((a, b) => b.n - a.n || new Date(a.c.created_at) - new Date(b.c.created_at))[0] || null;
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-like]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    const mid = meId(); if (!mid) return;
+    const cid = b.dataset.like, on = likedByMe(cid);
+    const paint = () => $$(`[data-like="${cid}"]`).forEach((el) => { el.outerHTML = likeBtn(cid); });
+    if (on) S.likes = S.likes.filter((x) => !(x.comment_id === cid && x.participant_id === mid));
+    else S.likes.push({ comment_id: cid, participant_id: mid });
+    paint();
+    const { error } = on
+      ? await db.from('likes').delete().match({ comment_id: cid, participant_id: mid })
+      : await db.from('likes').insert({ comment_id: cid, participant_id: mid });
+    if (error && error.code !== '23505') {
+      if (on) S.likes.push({ comment_id: cid, participant_id: mid });
+      else S.likes = S.likes.filter((x) => !(x.comment_id === cid && x.participant_id === mid));
+      paint(); toast('Não deu pra curtir agora.');
+    }
+  });
 
   async function uploadPhoto(blob, folder) {
     const type = blob.type || 'image/jpeg';
@@ -508,7 +542,7 @@
         <div class="row" style="margin-top:6px"><div class="grow section-title" style="margin:0">Conversa do dia</div><div class="small">${thread.length} ${thread.length === 1 ? 'comentário' : 'comentários'}</div></div>
         <div class="stack" style="gap:10px">${thread.length ? thread.map((c) => {
           const p = person(c.participant_id);
-          return `<div class="comment">${avatar(p, 32)}<div class="bubble"><b>${esc(p?.name || '?')}</b> <span class="small">· ${timeAgo(c.created_at)}</span><br>${esc(c.body)}</div></div>`;
+          return `<div class="comment">${avatar(p, 32)}<div class="bubble"><b>${esc(p?.name || '?')}</b> <span class="small">· ${timeAgo(c.created_at)}</span><br>${esc(c.body)}<div class="bubble-foot">${likeBtn(c.id)}</div></div></div>`;
         }).join('') : '<div class="small">Ninguém comentou ainda. Que tal começar?</div>'}</div>
         ${day <= Math.max(todayIdx(), 0) || open ? `
         <div class="composer">
@@ -611,32 +645,167 @@
   });
 
   // --- mural ---
-  route('mural', () => {
+  route('mural', (arg) => {
     shell(true, 'mural');
-    const items = [
-      ...S.checkins.filter((c) => c.kind === 'treino').map((c) => ({ ...c, type: 'treino' })),
-      ...S.comments.map((c) => ({ ...c, type: 'comentario' }))
-    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 80);
+    const maxDay = Math.max(1, Math.min(todayIdx(), TOTAL_DAYS));
+    const day = Math.min(Math.max(Number(arg) || maxDay, 1), maxDay);
+    const treinos = S.checkins.filter((c) => c.kind === 'treino' && c.day === day)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const coments = S.comments.filter((c) => c.day === day)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const top = topComment(day);
+    const comFotos = treinos.filter((t) => t.photo_url).length;
+    const arrow = (d, label, icon, ok) => ok
+      ? `<a class="icon-btn" href="#/mural/${d}" aria-label="${label}" style="margin:0">${icon}</a>`
+      : `<span class="icon-btn off" aria-hidden="true" style="margin:0">${icon}</span>`;
+    const comentCard = (c, destaque) => {
+      const p = person(c.participant_id);
+      return `<div class="card comment-card${destaque ? ' destaque' : ''}">
+        ${destaque ? '<div class="kicker" style="margin-bottom:8px">COMENTÁRIO MAIS CURTIDO</div>' : ''}
+        <div style="display:flex;gap:10px">${avatar(p, 36)}<div class="grow">
+          <div class="row"><b class="grow">${esc(p?.name)}</b><span class="small">${timeAgo(c.created_at)}</span></div>
+          <a href="#/leitura/${c.day}" class="com-body">${esc(c.body)}</a>
+          <div class="bubble-foot">${likeBtn(c.id)}</div>
+        </div></div></div>`;
+    };
     app.innerHTML = `
       <div class="stack" style="padding-top:22px">
         <h1 style="font-size:36px">MURAL</h1>
-        ${items.length ? items.map((it) => {
+        <div class="daybar">
+          ${arrow(day - 1, 'Dia anterior', ICON.back, day > 1)}
+          <div class="grow center"><div class="kicker">${day === todayIdx() ? 'HOJE · ' : ''}DIA ${day} DE ${TOTAL_DAYS}</div><b>${dayLabel(day)}</b></div>
+          ${arrow(day + 1, 'Próximo dia', ICON.next, day < maxDay)}
+        </div>
+        ${comFotos ? `<button class="btn gold" id="shareDay" type="button">${ICON.share} Compartilhar montagem do dia</button>` : ''}
+        ${top && top.n > 0 ? comentCard(top.c, true) : ''}
+        <div class="section-title">Treinos <span class="small">(${treinos.length})</span></div>
+        ${treinos.length ? treinos.map((it) => {
           const p = person(it.participant_id);
-          if (it.type === 'treino') return `
-            <div class="post">
-              <div class="head">${avatar(p, 36)}<div class="grow"><b>${esc(p?.name)}</b><div class="small">${esc(it.activity)} · ${it.minutes} min · dia ${it.day}</div></div><span class="small">${timeAgo(it.created_at)}</span></div>
+          return `<div class="post">
+              <div class="head">${avatar(p, 36)}<div class="grow"><b>${esc(p?.name)}</b><div class="small">${esc(it.activity)} · ${it.minutes} min</div></div><span class="small">${timeAgo(it.created_at)}</span></div>
               ${it.photo_url ? `<img class="ph" src="${esc(it.photo_url)}" alt="Treino de ${esc(p?.name)}" loading="lazy">` : ''}
               ${it.caption ? `<div class="body">${esc(it.caption)}</div>` : ''}
             </div>`;
-          return `
-            <a class="card" href="#/leitura/${it.day}" style="text-decoration:none;color:var(--ink);display:flex;gap:10px">
-              ${avatar(p, 36)}<div class="grow"><div class="row"><b class="grow">${esc(p?.name)}</b><span class="small">${timeAgo(it.created_at)}</span></div>
-              <div class="kicker" style="margin:2px 0 4px">${chaptersLabel(it.day)}</div><div style="font-size:15px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${esc(it.body)}</div></div>
-            </a>`;
-        }).join('') : '<div class="card sub">Os treinos e comentários do grupo vão aparecer aqui.</div>'}
+        }).join('') : '<div class="card sub">Ninguém postou treino nesse dia ainda.</div>'}
+        <div class="section-title">Comentários da leitura <span class="small">(${coments.length})</span></div>
+        <div class="small" style="margin-top:-8px">${chaptersLabel(day)} · toque no coração pra curtir</div>
+        ${coments.length ? coments.map((c) => comentCard(c, false)).join('') : '<div class="card sub">Ninguém comentou a leitura desse dia ainda.</div>'}
       </div>`;
     $$('img.ph').forEach((img) => img.onclick = () => zoom(img.src));
+    const sh = $('#shareDay'); if (sh) sh.onclick = () => openCollage(day, sh);
   });
+
+  // ---------- montagem do dia ----------
+  const rr = (g, x, y, w, h, r) => {
+    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  };
+  const wrap = (g, text, maxW, maxLines) => {
+    const words = String(text).replace(/\s+/g, ' ').trim().split(' '), lines = [];
+    let line = '';
+    for (const w of words) {
+      const t = line ? line + ' ' + w : w;
+      if (g.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
+    }
+    if (line) lines.push(line);
+    if (lines.length > maxLines) {
+      const cut = lines.slice(0, maxLines); let last = cut[maxLines - 1];
+      while (g.measureText(last + '…').width > maxW && last.length) last = last.slice(0, -1);
+      cut[maxLines - 1] = last.trim() + '…'; return cut;
+    }
+    return lines;
+  };
+  async function makeCollage(day) {
+    try { await Promise.all(['700 92px "Barlow Condensed"', '700 28px Figtree', '400 30px Figtree', '600 34px Figtree'].map((f) => document.fonts.load(f))); } catch { /* usa a fonte do sistema */ }
+    const posts = S.checkins.filter((c) => c.kind === 'treino' && c.day === day && c.photo_url)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).slice(0, 16);
+    const tiles = (await Promise.all(posts.map(async (p) => {
+      try {
+        const b = await fetch(p.photo_url).then((r) => { if (!r.ok) throw new Error(); return r.blob(); });
+        return { img: await decodeImg(b), name: person(p.participant_id)?.name || '' };
+      } catch { return null; }
+    }))).filter(Boolean);
+    const W = 1080, H = 1350, P = 56;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#F6F1E6'; g.fillRect(0, 0, W, H);
+    g.textBaseline = 'alphabetic';
+    g.fillStyle = '#8A5A2B'; g.font = '700 28px Figtree, sans-serif';
+    g.fillText(`GC SAMAMBAIA · DIA ${day} DE ${TOTAL_DAYS}`, P, P + 26);
+    g.fillStyle = '#2F3A26'; g.font = '700 92px "Barlow Condensed", sans-serif';
+    g.fillText('TREINOS DO DIA', P, P + 26 + 92);
+    g.fillStyle = '#5B6150'; g.font = '400 30px Figtree, sans-serif';
+    g.fillText(`${dayLabel(day)} · ${tiles.length} ${tiles.length === 1 ? 'pessoa treinou' : 'pessoas treinaram'}`, P, P + 26 + 92 + 50);
+    // comentário mais curtido
+    const top = topComment(day);
+    let boxH = 0, lines = [];
+    if (top) {
+      g.font = '600 34px Figtree, sans-serif';
+      lines = wrap(g, `“${top.c.body}”`, W - 2 * P - 64, 4);
+      boxH = 32 + 26 + 18 + lines.length * 46 + 18 + 30 + 32;
+    }
+    const footH = 44, gridTop = 260, gridBottom = H - P - footH - (top ? boxH + 28 : 0);
+    // grade de fotos
+    const n = Math.max(tiles.length, 1), cols = n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4, rows = Math.ceil(n / cols), gap = 14;
+    const availW = W - 2 * P, availH = gridBottom - gridTop;
+    const cell = Math.floor(Math.min((availW - (cols - 1) * gap) / cols, (availH - (rows - 1) * gap) / rows));
+    const gridW = cols * cell + (cols - 1) * gap, gridH = rows * cell + (rows - 1) * gap;
+    const x0 = P + (availW - gridW) / 2, y0 = gridTop + (availH - gridH) / 2;
+    tiles.forEach((t, i) => {
+      const x = x0 + (i % cols) * (cell + gap), y = y0 + Math.floor(i / cols) * (cell + gap);
+      const iw = t.img.width, ih = t.img.height, k = Math.max(cell / iw, cell / ih);
+      g.save(); rr(g, x, y, cell, cell, 22); g.clip();
+      g.drawImage(t.img, x + (cell - iw * k) / 2, y + (cell - ih * k) / 2, iw * k, ih * k);
+      const fs = cell > 300 ? 30 : cell > 220 ? 26 : 22;
+      g.font = `700 ${fs}px Figtree, sans-serif`;
+      const tw = g.measureText(t.name).width, ph = fs + 18;
+      g.fillStyle = 'rgba(35,43,28,.82)'; rr(g, x + 12, y + cell - ph - 12, Math.min(tw + 28, cell - 24), ph, ph / 2); g.fill();
+      g.fillStyle = '#F6F1E6'; g.fillText(t.name, x + 26, y + cell - 12 - ph / 2 + fs * 0.36, cell - 52);
+      g.restore();
+      if (t.img.close) t.img.close();
+    });
+    if (top) {
+      const by = gridBottom + 28, p = person(top.c.participant_id);
+      g.fillStyle = '#2F3A26'; rr(g, P, by, W - 2 * P, boxH, 28); g.fill();
+      let y = by + 32 + 22;
+      g.fillStyle = '#E2C287'; g.font = '700 24px Figtree, sans-serif';
+      g.fillText(top.n > 0 ? 'COMENTÁRIO MAIS CURTIDO' : 'DA LEITURA DO DIA', P + 32, y);
+      g.fillStyle = '#F6F1E6'; g.font = '600 34px Figtree, sans-serif'; y += 18;
+      lines.forEach((ln) => { y += 46; g.fillText(ln, P + 32, y); });
+      y += 18 + 30;
+      g.fillStyle = '#E2C287'; g.font = '700 26px Figtree, sans-serif';
+      g.fillText(`${p?.name || ''} · ${chaptersLabel(day)}${top.n > 0 ? ` · ${top.n} ${top.n === 1 ? 'curtida' : 'curtidas'}` : ''}`, P + 32, y);
+    }
+    g.fillStyle = '#6B6F60'; g.font = '400 24px Figtree, sans-serif';
+    g.fillText('Desafio Corpo e Espírito · Lagoinha Valinhos', P, H - P);
+    return canvasToBlob(c);
+  }
+  async function openCollage(day, btn) {
+    const label = btn.innerHTML; btn.disabled = true; btn.textContent = 'Montando…';
+    try {
+      const blob = await makeCollage(day);
+      const url = URL.createObjectURL(blob);
+      const file = new File([blob], `desafio-dia-${day}.jpg`, { type: 'image/jpeg' });
+      const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+      const m = document.createElement('div'); m.className = 'cropper';
+      m.innerHTML = `<div class="crop-box">
+        <div class="row" style="width:100%"><div class="crop-title grow">MONTAGEM DO DIA ${day}</div><button class="icon-btn mc-close" type="button" aria-label="Fechar" style="margin:0">${ICON.x}</button></div>
+        <img src="${url}" alt="Montagem dos treinos do dia ${day}" style="width:100%;border-radius:14px;max-height:60dvh;object-fit:contain;background:#fff">
+        ${canShare ? '<button class="btn gold mc-share" type="button">Compartilhar</button>' : ''}
+        <a class="btn ${canShare ? 'outline' : ''}" href="${url}" download="desafio-dia-${day}.jpg" style="text-decoration:none">Salvar imagem</a>
+      </div>`;
+      document.body.appendChild(m);
+      const close = () => { m.remove(); URL.revokeObjectURL(url); };
+      $('.mc-close', m).onclick = close;
+      m.addEventListener('click', (e) => { if (e.target === m) close(); });
+      const s2 = $('.mc-share', m);
+      if (s2) s2.onclick = async () => {
+        try { await navigator.share({ files: [file], title: `Desafio Corpo e Espírito · Dia ${day}` }); }
+        catch (e) { if (e && e.name !== 'AbortError') toast('Não deu pra compartilhar. Use Salvar imagem.'); }
+      };
+    } catch (e) { console.error(e); toast('Não deu pra montar agora. Tenta de novo.'); }
+    finally { btn.disabled = false; btn.innerHTML = label; }
+  }
 
   // --- ranking ---
   route('ranking', () => {
