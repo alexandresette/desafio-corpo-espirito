@@ -389,8 +389,10 @@
           <button class="send" id="send" aria-label="Enviar comentário">${ICON.send}</button>
         </div>` : ''}
       </div>`;
+    const textoBox = $('#texto');
     loadProv().then((prov) => {
-      const box = $('#texto'); if (!box) return;
+      const box = textoBox; if (!box || !box.isConnected || box.dataset.ready) return;
+      box.dataset.ready = '1';
       box.innerHTML = chs.map((c) => `
         ${chs.length > 1 ? `<h2>Provérbios ${c}</h2>` : ''}
         <p>${(prov[c] || []).map((v, i) => `<span class="v" data-c="${c}" data-n="${i + 1}"><sup>${i + 1}</sup>${esc(v)}</span>`).join(' ')}</p>`).join('');
