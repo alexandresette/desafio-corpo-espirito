@@ -1,6 +1,6 @@
-// Preencha com os dados do seu projeto Supabase (Project Settings > API).
-// A anon key é pública por natureza. Nunca coloque a service_role key aqui.
+// Dados do projeto Supabase (Project Settings > API Keys).
+// A publishable key é pública por natureza. Nunca coloque a secret key aqui.
 window.CONFIG = {
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: ''
+  SUPABASE_URL: 'https://milezgzaycnmtgpzyxcu.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_jGf0VHhCQbu-YmjbLOsOig_lbOzlEsf'
 };

@@ -39,6 +39,8 @@ create policy "aberto" on participants for all to anon using (true) with check (
 create policy "aberto" on checkins for all to anon using (true) with check (true);
 create policy "aberto" on comments for all to anon using (true) with check (true);
 
+grant select, insert, update, delete on participants, checkins, comments to anon;
+
 -- Fotos (perfil e treinos)
 insert into storage.buckets (id, name, public)
 values ('fotos', 'fotos', true)
