@@ -836,8 +836,13 @@
   // atualiza quando o app volta pra frente (ex.: alguém postou enquanto estava fechado)
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible' || !S.loaded) return;
-    const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
-    try { await load(); if (!typing) render(); } catch { /* sem rede */ }
+    // Só atualiza telas de leitura. Formulários (cadastro, treino, leitura com comentário)
+    // não podem ser recriados: abrir a galeria também esconde a página.
+    const name = location.hash.replace(/^#\/?/, '').split('/')[0] || 'hoje';
+    const safe = ['hoje', 'mural', 'ranking', 'calendario'].includes(name);
+    const busy = document.querySelector('.cropper') || (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName));
+    if (!safe || busy || !me()) return;
+    try { await load(); if (!document.querySelector('.cropper')) render(); } catch { /* sem rede */ }
   });
 
   load().then(render).catch((err) => {
