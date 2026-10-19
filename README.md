@@ -22,3 +22,7 @@ Front estático (HTML, CSS e JS puro) no GitHub Pages e Supabase pro banco e pra
 1. Crie um projeto no [Supabase](https://supabase.com).
 2. No SQL Editor, rode `supabase/schema.sql`.
 3. Coloque a Project URL e a anon key em `config.js`.
+
+## Texto bíblico
+
+O texto de Provérbios dentro do app é da **Bíblia Livre (BLIVRE)**, revisão da Almeida em português do Brasil, licença [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Copyright © Diego Santos, Mario Sérgio e Marco Teles. Fonte: [eBible.org](https://ebible.org/porbr2018/copyright.htm), edição de 2018. A NVI fica disponível por link, porque é protegida por direitos autorais.

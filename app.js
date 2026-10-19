@@ -18,6 +18,9 @@
     return plan;
   })();
   const nviUrl = (ch) => `https://www.bible.com/pt/bible/129/PRO.${ch}.NVI`;
+  // Texto: Bíblia Livre (BLIVRE), CC BY 4.0
+  let PROV = null;
+  const loadProv = async () => { if (!PROV) PROV = await fetch('proverbios.json?v=1').then((r) => r.json()); return PROV; };
 
   // ---------- datas ----------
   const todayStr = () => new Date().toLocaleDateString('sv-SE', { timeZone: TZ });
@@ -367,7 +370,8 @@
       <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a>
         <div class="grow"><div class="kicker">DIA ${day} · ${dayLabel(day).toUpperCase()}${chs.length > 1 ? ' · DUPLO' : ''}</div><div style="font-size:18px;font-weight:700">${chaptersLabel(day)} · NVI</div></div></div>
       <div class="stack" style="padding-top:8px">
-        ${chs.map((c) => `<a class="chapter-link" href="${nviUrl(c)}" target="_blank" rel="noopener"><div><div class="small">Abrir no app da Bíblia</div><b>Provérbios ${c}</b></div>${ICON.out}</a>`).join('')}
+        <article class="texto" id="texto"><div class="small">Carregando o capítulo…</div></article>
+        <div class="fonte">Texto: Bíblia Livre (BLIVRE), CC BY 4.0 · Prefere a NVI? ${chs.map((c) => `<a href="${nviUrl(c)}" target="_blank" rel="noopener">Provérbios ${c}</a>`).join(' e ')}</div>
         ${done
           ? `<div class="card row" style="background:var(--olive);color:var(--cream)"><span style="width:36px;height:36px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center">${ICON.check}</span><div class="grow" style="font-weight:700">Leitura marcada</div></div>`
           : open
@@ -385,6 +389,15 @@
           <button class="send" id="send" aria-label="Enviar comentário">${ICON.send}</button>
         </div>` : ''}
       </div>`;
+    loadProv().then((prov) => {
+      const box = $('#texto'); if (!box) return;
+      box.innerHTML = chs.map((c) => `
+        ${chs.length > 1 ? `<h2>Provérbios ${c}</h2>` : ''}
+        <p>${(prov[c] || []).map((v, i) => `<sup>${i + 1}</sup>${esc(v)}`).join(' ')}</p>`).join('');
+    }).catch(() => {
+      const box = $('#texto');
+      if (box) box.innerHTML = `<div class="small">Não consegui carregar o texto. Abra na NVI pelo link abaixo.</div>`;
+    });
     const mark = $('#markRead');
     if (mark) mark.onclick = async () => {
       mark.disabled = true;
