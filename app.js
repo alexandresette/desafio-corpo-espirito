@@ -67,19 +67,58 @@
   };
 
   // reduz a foto antes de subir (máx 1080px, jpeg)
-  const shrink = (file, max = 1080) => new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const s = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      c.toBlob((b) => b ? resolve(b) : reject(new Error('foto')), 'image/jpeg', 0.82);
-      URL.revokeObjectURL(img.src);
-    };
-    img.onerror = () => reject(new Error('Não consegui abrir essa foto.'));
-    img.src = URL.createObjectURL(file);
-  });
+  // Tenta, em ordem: createImageBitmap, <img>, conversão de HEIC. Se nada abrir,
+  // devolve o arquivo original pra pessoa não ficar travada.
+  const isHeic = (f) => !f.type || /hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name || '');
+  const decodeImg = async (file) => {
+    if (window.createImageBitmap) {
+      try { return await createImageBitmap(file); } catch { /* tenta pelo <img> */ }
+    }
+    return new Promise((res, rej) => {
+      const img = new Image(); const url = URL.createObjectURL(file);
+      const t = setTimeout(() => rej(new Error('timeout')), 15000);
+      img.onload = () => { clearTimeout(t); res(img); };
+      img.onerror = () => { clearTimeout(t); URL.revokeObjectURL(url); rej(new Error('decode')); };
+      img.src = url;
+    });
+  };
+  let heicLib = null;
+  const loadHeic = () => heicLib || (heicLib = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    s.onload = () => res(window.heic2any); s.onerror = () => { heicLib = null; rej(new Error('heic')); };
+    document.head.appendChild(s);
+  }));
+  const canvasToBlob = (c) => new Promise((res) => c.toBlob((b) => {
+    if (b) return res(b);
+    const d = c.toDataURL('image/jpeg', 0.82).split(',')[1], bin = atob(d), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    res(new Blob([u8], { type: 'image/jpeg' }));
+  }, 'image/jpeg', 0.82));
+  const shrink = async (file, max = 1080) => {
+    let src = null;
+    try { src = await decodeImg(file); } catch {
+      if (isHeic(file)) {
+        try {
+          const conv = await (await loadHeic())({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+          src = await decodeImg(Array.isArray(conv) ? conv[0] : conv);
+        } catch { /* cai no original */ }
+      }
+    }
+    if (!src) {
+      if (file.size > 12 * 1024 * 1024) throw new Error('Essa foto é grande demais. Tenta outra, ou tira um print dela e escolhe o print.');
+      return { blob: file, original: true };
+    }
+    const w = src.width, h = src.height, s = Math.min(1, max / Math.max(w, h));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    if (src.close) src.close();
+    return { blob: await canvasToBlob(c), original: false };
+  };
+  const photoPreview = (r) => r.original
+    ? '<span style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--olive)">' + ICON.check.replace('#232B1C', '#2F3A26') + 'Foto escolhida</span>'
+    : `<img src="${URL.createObjectURL(r.blob)}" alt="Foto escolhida">`;
 
   // ---------- dados ----------
   const cfg = window.CONFIG || {};
@@ -107,8 +146,10 @@
   }
 
   async function uploadPhoto(blob, folder) {
-    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-    const { error } = await db.storage.from('fotos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    const type = blob.type || 'image/jpeg';
+    const ext = (type.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await db.storage.from('fotos').upload(path, blob, { contentType: type, upsert: false });
     if (error) throw error;
     return db.storage.from('fotos').getPublicUrl(path).data.publicUrl;
   }
@@ -203,6 +244,7 @@
         <div class="stack center" style="gap:8px">
           <button class="photo-pick" id="pick" aria-label="Adicionar sua foto">${ICON.cam}<span class="plus">+</span></button>
           <input type="file" id="file" accept="image/*" hidden>
+          <div class="err" id="photoErr" hidden></div>
           <div style="font-size:14px;font-weight:700">Sua foto <span style="color:var(--err)">(obrigatória)</span></div>
           <div class="small" style="margin-top:-6px">Ela aparece no ranking e no calendário</div>
         </div>
@@ -210,24 +252,37 @@
         <div><label class="lbl" for="p1">Crie um PIN de 4 números</label><input class="input pin" id="p1" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="••••"></div>
         <div><label class="lbl" for="p2">Confirme o PIN</label><input class="input pin" id="p2" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="••••"><div class="err" id="mismatch" hidden>Os dois PINs estão diferentes. Tenta de novo.</div></div>
         <button class="btn" id="save" disabled>Entrar no desafio</button>
-        <div class="small center">O botão libera quando tiver foto, nome e PIN confirmado.</div>
+        <div class="small center" id="missing">Falta: foto, nome e PIN.</div>
+        <div class="small center">Se a galeria não abrir, abra o link direto no Chrome ou no Safari, fora do WhatsApp.</div>
       </div>`;
     const nome = $('#nome'), p1 = $('#p1'), p2 = $('#p2'), save = $('#save');
     onlyDigits(p1); onlyDigits(p2);
     const check = () => {
       const mismatch = p2.value.length === 4 && p1.value !== p2.value;
       $('#mismatch').hidden = !mismatch; p2.classList.toggle('bad', mismatch);
-      save.disabled = !(blob && nome.value.trim() && p1.value.length === 4 && p1.value === p2.value);
+      const falta = [];
+      if (!blob) falta.push('foto');
+      if (!nome.value.trim()) falta.push('nome');
+      if (p1.value.length !== 4) falta.push('PIN');
+      else if (p1.value !== p2.value) falta.push('confirmar o PIN');
+      save.disabled = falta.length > 0;
+      $('#missing').textContent = falta.length ? `Falta: ${falta.join(', ').replace(/, ([^,]*)$/, ' e $1')}.` : 'Tudo certo, pode entrar.';
     };
     [nome, p1, p2].forEach((el) => el.addEventListener('input', check));
     $('#pick').onclick = () => $('#file').click();
     $('#file').onchange = async (e) => {
-      const f = e.target.files[0]; if (!f) return;
+      const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+      const pe = $('#photoErr'); pe.hidden = true;
+      $('#pick').innerHTML = '<span class="small">Abrindo…</span>';
       try {
-        blob = await shrink(f, 600);
-        $('#pick').innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="Sua foto">`;
+        const r = await shrink(f, 600); blob = r.blob;
+        $('#pick').innerHTML = photoPreview(r) + '<span class="plus">+</span>';
         check();
-      } catch (err) { toast(err.message); }
+      } catch (err) {
+        blob = null; check();
+        $('#pick').innerHTML = ICON.cam + '<span class="plus">+</span>';
+        pe.textContent = err.message; pe.hidden = false;
+      }
     };
     save.onclick = async () => {
       const name = nome.value.trim();
@@ -459,9 +514,10 @@
     const check = () => { post.disabled = !(blob && activity && minutes >= MIN_MINUTES); };
     $('#pick').onclick = () => $('#file').click();
     $('#file').onchange = async (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      try { blob = await shrink(f); const b = $('#pick'); b.classList.add('has'); b.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="Foto do treino">`; check(); }
-      catch (err) { toast(err.message); }
+      const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+      const b = $('#pick'); b.innerHTML = '<span class="small">Abrindo…</span>';
+      try { const r = await shrink(f); blob = r.blob; b.classList.toggle('has', !r.original); b.innerHTML = photoPreview(r); check(); }
+      catch (err) { blob = null; check(); b.classList.remove('has'); b.innerHTML = `${ICON.cam}<span style="font-size:15px;font-weight:700;color:var(--err);padding:0 16px;text-align:center">${esc(err.message)}</span>`; }
     };
     $$('.chip').forEach((c) => c.onclick = () => { activity = c.dataset.a; $$('.chip').forEach((x) => x.classList.toggle('on', x === c)); check(); });
     $('#minus').onclick = () => { minutes = Math.max(MIN_MINUTES, minutes - 5); $('#min').textContent = minutes; };
