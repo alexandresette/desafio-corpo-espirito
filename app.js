@@ -127,7 +127,7 @@
         <div class="crop-view${round ? ' round' : ''}"><canvas></canvas></div>
         <div class="small center">Arraste pra enquadrar. Use o controle ou dois dedos pra dar zoom.</div>
         <input type="range" class="crop-zoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
-        <div class="row"><button class="btn outline crop-cancel" type="button">Trocar foto</button><button class="btn crop-ok" type="button">Usar foto</button></div>
+        <div class="row"><button class="btn outline crop-cancel" type="button">Cancelar</button><button class="btn crop-ok" type="button">Usar foto</button></div>
       </div>`;
       document.body.appendChild(m);
       const view = m.querySelector('.crop-view'), cv = m.querySelector('canvas'), zoomEl = m.querySelector('.crop-zoom');
