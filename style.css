@@ -171,3 +171,11 @@ button.tag { border: 0; cursor: pointer; }
 .texto sup:first-child { margin-left: 0; }
 .fonte { font-size: 12px; color: var(--muted-2); line-height: 1.5; margin-top: -6px; }
 .fonte a { color: var(--clay); }
+.texto .v { cursor: pointer; border-radius: 4px; transition: background .15s; -webkit-user-select: none; user-select: none; }
+.texto .v.sel { background: #F3E3C6; box-shadow: 0 0 0 2px #F3E3C6; text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.copybar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom)); width: min(448px, calc(100vw - 24px)); background: var(--ink); color: var(--cream); border-radius: 18px; padding: 8px 8px 8px 16px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.copybar[hidden] { display: none; }
+.copybar .cb-ref { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.copybar button { height: 44px; border: 0; border-radius: 12px; padding: 0 14px; font-weight: 700; font-size: 15px; cursor: pointer; }
+.copybar .cb-clear { background: transparent; color: var(--line-2); }
+.copybar .cb-copy { background: var(--gold); color: var(--ink); }

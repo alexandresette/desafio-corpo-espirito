@@ -393,7 +393,8 @@
       const box = $('#texto'); if (!box) return;
       box.innerHTML = chs.map((c) => `
         ${chs.length > 1 ? `<h2>Provérbios ${c}</h2>` : ''}
-        <p>${(prov[c] || []).map((v, i) => `<sup>${i + 1}</sup>${esc(v)}`).join(' ')}</p>`).join('');
+        <p>${(prov[c] || []).map((v, i) => `<span class="v" data-c="${c}" data-n="${i + 1}"><sup>${i + 1}</sup>${esc(v)}</span>`).join(' ')}</p>`).join('');
+      setupVerseCopy(box, prov);
     }).catch(() => {
       const box = $('#texto');
       if (box) box.innerHTML = `<div class="small">Não consegui carregar o texto. Abra na NVI pelo link abaixo.</div>`;
@@ -565,6 +566,56 @@
     $$('.cal button').forEach((b) => b.onclick = () => go(`#/calendario/${b.dataset.d}`));
     $$('[data-ph]').forEach((b) => b.onclick = () => zoom(b.dataset.ph));
   });
+
+  // seleção e cópia de versículos
+  function verseRef(sel) {
+    const byCh = {};
+    sel.forEach(([c, n]) => (byCh[c] = byCh[c] || []).push(n));
+    return 'Provérbios ' + Object.keys(byCh).map(Number).sort((a, b) => a - b).map((c) => {
+      const ns = byCh[c].sort((a, b) => a - b), parts = [];
+      let s = ns[0], p = ns[0];
+      for (let i = 1; i <= ns.length; i++) {
+        if (ns[i] === p + 1) { p = ns[i]; continue; }
+        parts.push(s === p ? `${s}` : `${s}-${p}`); s = p = ns[i];
+      }
+      return `${c}:${parts.join(',')}`;
+    }).join('; ');
+  }
+  async function copyText(txt) {
+    try { await navigator.clipboard.writeText(txt); return true; } catch {
+      const t = document.createElement('textarea'); t.value = txt; t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select(); let ok = false;
+      try { ok = document.execCommand('copy'); } catch { /* sem cópia */ }
+      t.remove(); return ok;
+    }
+  }
+  function setupVerseCopy(box, prov) {
+    document.querySelector('.copybar')?.remove();
+    const bar = document.createElement('div');
+    bar.className = 'copybar'; bar.hidden = true;
+    bar.innerHTML = '<span class="cb-ref"></span><button class="cb-clear" type="button">Limpar</button><button class="cb-copy" type="button">Copiar</button>';
+    document.body.appendChild(bar);
+    const selected = () => $$('.v.sel', box).map((el) => [Number(el.dataset.c), Number(el.dataset.n)]);
+    const update = () => {
+      const s = selected();
+      bar.hidden = !s.length;
+      if (s.length) $('.cb-ref', bar).textContent = verseRef(s);
+    };
+    const clear = () => { $$('.v.sel', box).forEach((el) => el.classList.remove('sel')); update(); };
+    box.addEventListener('click', (e) => {
+      const v = e.target.closest('.v'); if (!v) return;
+      v.classList.toggle('sel'); update();
+    });
+    $('.cb-clear', bar).onclick = clear;
+    $('.cb-copy', bar).onclick = async () => {
+      const s = selected();
+      const body = s.map(([c, n]) => prov[c][n - 1]).join(' ');
+      const ok = await copyText(`"${body}"\n${verseRef(s)} (Bíblia Livre)`);
+      toast(ok ? 'Copiado. É só colar no WhatsApp.' : 'Não deu pra copiar neste celular.');
+      if (ok) clear();
+    };
+    window.addEventListener('hashchange', () => bar.remove(), { once: true });
+  }
 
   function zoom(src) {
     const m = document.createElement('div');
