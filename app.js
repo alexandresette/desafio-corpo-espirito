@@ -95,26 +95,97 @@
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     res(new Blob([u8], { type: 'image/jpeg' }));
   }, 'image/jpeg', 0.82));
-  const shrink = async (file, max = 1080) => {
-    let src = null;
-    try { src = await decodeImg(file); } catch {
+  const decodeAny = async (file) => {
+    try { return await decodeImg(file); } catch {
       if (isHeic(file)) {
         try {
           const conv = await (await loadHeic())({ blob: file, toType: 'image/jpeg', quality: 0.85 });
-          src = await decodeImg(Array.isArray(conv) ? conv[0] : conv);
+          return await decodeImg(Array.isArray(conv) ? conv[0] : conv);
         } catch { /* cai no original */ }
       }
     }
+    return null;
+  };
+  // reduz fotos enormes antes do enquadramento, pra arrastar sem travar
+  const limitSize = (src, max = 2000) => {
+    const k = Math.min(1, max / Math.max(src.width, src.height));
+    if (k === 1) return src;
+    const c = document.createElement('canvas');
+    c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    if (src.close) src.close();
+    return c;
+  };
+  // tela de enquadramento: arrastar, zoom por controle ou pinça
+  function cropImage(src, { aspect = 1, round = false, outW = 600 } = {}) {
+    return new Promise((resolve) => {
+      const iw = src.width, ih = src.height;
+      const m = document.createElement('div'); m.className = 'cropper';
+      m.innerHTML = `<div class="crop-box">
+        <div class="crop-title">Ajuste a foto</div>
+        <div class="crop-view${round ? ' round' : ''}"><canvas></canvas></div>
+        <div class="small center">Arraste pra enquadrar. Use o controle ou dois dedos pra dar zoom.</div>
+        <input type="range" class="crop-zoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
+        <div class="row"><button class="btn outline crop-cancel" type="button">Trocar foto</button><button class="btn crop-ok" type="button">Usar foto</button></div>
+      </div>`;
+      document.body.appendChild(m);
+      const view = m.querySelector('.crop-view'), cv = m.querySelector('canvas'), zoomEl = m.querySelector('.crop-zoom');
+      const vw = Math.min(window.innerWidth - 64, 320), vh = Math.round(vw / aspect);
+      view.style.width = vw + 'px'; view.style.height = vh + 'px';
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr); cv.style.width = vw + 'px'; cv.style.height = vh + 'px';
+      const g = cv.getContext('2d');
+      const base = Math.max(vw / iw, vh / ih);
+      let z = 1, cx = iw / 2, cy = ih / 2;
+      const clamp = () => {
+        const sc = base * z, hw = vw / 2 / sc, hh = vh / 2 / sc;
+        cx = Math.min(Math.max(cx, hw), iw - hw); cy = Math.min(Math.max(cy, hh), ih - hh);
+      };
+      const draw = (ctx, W, H, k) => {
+        const sc = base * z * k;
+        ctx.fillStyle = '#EEE7D8'; ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(src, W / 2 - cx * sc, H / 2 - cy * sc, iw * sc, ih * sc);
+      };
+      const paint = () => { clamp(); draw(g, cv.width, cv.height, dpr); };
+      paint();
+      const pts = new Map(); let pinch0 = null;
+      view.addEventListener('pointerdown', (e) => {
+        view.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z }; }
+      });
+      view.addEventListener('pointermove', (e) => {
+        if (!pts.has(e.pointerId)) return;
+        const p0 = pts.get(e.pointerId), dx = e.clientX - p0.x, dy = e.clientY - p0.y;
+        pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pts.size === 2 && pinch0) {
+          const [a, b] = [...pts.values()];
+          z = Math.min(4, Math.max(1, pinch0.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch0.d)); zoomEl.value = z;
+        } else if (pts.size === 1) { const sc = base * z; cx -= dx / sc; cy -= dy / sc; }
+        paint();
+      });
+      const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; };
+      view.addEventListener('pointerup', up); view.addEventListener('pointercancel', up);
+      zoomEl.addEventListener('input', () => { z = Number(zoomEl.value); paint(); });
+      const done = (b) => { m.remove(); resolve(b); };
+      m.querySelector('.crop-cancel').onclick = () => done(null);
+      m.querySelector('.crop-ok').onclick = async () => {
+        const oh = Math.round(outW / aspect), c = document.createElement('canvas');
+        c.width = outW; c.height = oh; draw(c.getContext('2d'), outW, oh, outW / vw);
+        done(await canvasToBlob(c));
+      };
+    });
+  }
+  // escolhe, enquadra e devolve { blob, original } ou null se a pessoa cancelar
+  const pickPhoto = async (file, crop) => {
+    let src = await decodeAny(file);
     if (!src) {
       if (file.size > 12 * 1024 * 1024) throw new Error('Essa foto é grande demais. Tenta outra, ou tira um print dela e escolhe o print.');
       return { blob: file, original: true };
     }
-    const w = src.width, h = src.height, s = Math.min(1, max / Math.max(w, h));
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
-    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    src = limitSize(src);
+    const blob = await cropImage(src, crop);
     if (src.close) src.close();
-    return { blob: await canvasToBlob(c), original: false };
+    return blob ? { blob, original: false } : null;
   };
   const photoPreview = (r) => r.original
     ? '<span style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--olive)">' + ICON.check.replace('#232B1C', '#2F3A26') + 'Foto escolhida</span>'
@@ -275,8 +346,11 @@
       const pe = $('#photoErr'); pe.hidden = true;
       $('#pick').innerHTML = '<span class="small">Abrindo…</span>';
       try {
-        const r = await shrink(f, 600); blob = r.blob;
-        $('#pick').innerHTML = photoPreview(r) + '<span class="plus">+</span>';
+        const r = await pickPhoto(f, { aspect: 1, round: true, outW: 600 });
+        if (!r) { $('#pick').innerHTML = (blob ? $('#pick').dataset.prev : ICON.cam) + '<span class="plus">+</span>'; return; }
+        blob = r.blob;
+        const prev = photoPreview(r); $('#pick').dataset.prev = prev;
+        $('#pick').innerHTML = prev + '<span class="plus">+</span>';
         check();
       } catch (err) {
         blob = null; check();
@@ -516,7 +590,11 @@
     $('#file').onchange = async (e) => {
       const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
       const b = $('#pick'); b.innerHTML = '<span class="small">Abrindo…</span>';
-      try { const r = await shrink(f); blob = r.blob; b.classList.toggle('has', !r.original); b.innerHTML = photoPreview(r); check(); }
+      try {
+        const r = await pickPhoto(f, { aspect: 4 / 5, outW: 900 });
+        if (!r) { b.innerHTML = blob ? b.dataset.prev : `${ICON.cam}<span style="font-size:17px;font-weight:700">Tirar ou escolher foto</span>`; return; }
+        blob = r.blob; b.classList.toggle('has', !r.original); b.dataset.prev = photoPreview(r); b.innerHTML = b.dataset.prev; check();
+      }
       catch (err) { blob = null; check(); b.classList.remove('has'); b.innerHTML = `${ICON.cam}<span style="font-size:15px;font-weight:700;color:var(--err);padding:0 16px;text-align:center">${esc(err.message)}</span>`; }
     };
     $$('.chip').forEach((c) => c.onclick = () => { activity = c.dataset.a; $$('.chip').forEach((x) => x.classList.toggle('on', x === c)); check(); });
