@@ -190,3 +190,11 @@ button.tag { border: 0; cursor: pointer; }
 .crop-zoom { width: 100%; accent-color: var(--olive); height: 32px; }
 .crop-box .row { width: 100%; gap: 10px; }
 .crop-box .btn { height: 50px; font-size: 16px; }
+
+/* ícones do menu */
+#tabs a::before { content: none; }
+#tabs a svg { width: 24px; height: 24px; }
+#tabs a.on svg { stroke: var(--olive); }
+#tabs a.on { color: var(--olive); }
+#tabs a:not(.on) svg { stroke: var(--muted-2); }
+.crop-box .photo-pick { flex-shrink: 0; }

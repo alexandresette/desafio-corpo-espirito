@@ -63,7 +63,8 @@
     check: '<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#232B1C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
     cam: '<svg aria-hidden="true" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#2F3A26" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
     send: '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#232B1C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
-    out: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>'
+    out: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>',
+    x: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'
   };
 
   // reduz a foto antes de subir (máx 1080px, jpeg)
@@ -472,9 +473,7 @@
         </div>
         ${body}
       </div>`;
-    $('#profile').onclick = () => {
-      if (confirm(`Sair da conta de ${m.name} neste celular?`)) { setMe(null); go('#/entrar'); }
-    };
+    $('#profile').onclick = openProfile;
   });
 
   // --- dia (atalho pra marcar ontem) ---
@@ -751,6 +750,69 @@
       if (ok) clear();
     };
     window.addEventListener('hashchange', () => bar.remove(), { once: true });
+  }
+
+  // perfil: nome, foto (trocar ou reenquadrar) e sair da conta
+  function openProfile() {
+    const m = me(); if (!m) return;
+    let blob = null;
+    const el = document.createElement('div'); el.className = 'cropper';
+    el.innerHTML = `<div class="crop-box" role="dialog" aria-label="Meu perfil">
+      <div class="row" style="width:100%"><div class="crop-title grow">MEU PERFIL</div><button class="icon-btn pf-close" type="button" aria-label="Fechar" style="margin:0">${ICON.x}</button></div>
+      <button class="photo-pick" id="pfPick" type="button" aria-label="Foto do perfil"><img src="${esc(m.photo_url)}" alt=""><span class="plus">+</span></button>
+      <div class="row" style="gap:8px;flex-wrap:wrap;justify-content:center">
+        <button class="tag on" id="pfAdjust" type="button">Ajustar enquadramento</button>
+        <button class="tag on" id="pfNew" type="button">Escolher outra foto</button>
+      </div>
+      <input type="file" id="pfFile" accept="image/*" hidden>
+      <div class="err" id="pfErr" hidden></div>
+      <div style="width:100%"><label class="lbl" for="pfName">Primeiro nome</label><input class="input" id="pfName" maxlength="20" autocomplete="given-name" value="${esc(m.name)}"></div>
+      <button class="btn" id="pfSave" type="button">Salvar</button>
+      <button class="link-btn" id="pfOut" type="button">Sair da conta neste celular</button>
+    </div>`;
+    document.body.appendChild(el);
+    const close = () => el.remove();
+    const pick = $('#pfPick', el), err = $('#pfErr', el);
+    const showErr = (msg) => { err.textContent = msg; err.hidden = !msg; };
+    const setPreview = (r) => { pick.innerHTML = photoPreview(r) + '<span class="plus">+</span>'; };
+    $('.pf-close', el).onclick = close;
+    el.addEventListener('click', (e) => { if (e.target === el) close(); });
+    $('#pfNew', el).onclick = () => $('#pfFile', el).click();
+    pick.onclick = () => $('#pfFile', el).click();
+    $('#pfFile', el).onchange = async (e) => {
+      const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+      showErr('');
+      try { const r = await pickPhoto(f, { aspect: 1, round: true, outW: 600 }); if (r) { blob = r.blob; setPreview(r); } }
+      catch (x) { showErr(x.message); }
+    };
+    $('#pfAdjust', el).onclick = async () => {
+      showErr('');
+      try {
+        const src0 = blob ? blob : await fetch(m.photo_url, { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(); return r.blob(); });
+        const src = await decodeAny(src0);
+        if (!src) { showErr('Não deu pra ajustar essa foto. Escolha outra.'); return; }
+        const out = await cropImage(limitSize(src), { aspect: 1, round: true, outW: 600 });
+        if (out) { blob = out; setPreview({ blob: out, original: false }); }
+      } catch { showErr('Não consegui abrir sua foto agora. Tenta de novo ou escolha outra.'); }
+    };
+    $('#pfSave', el).onclick = async () => {
+      const name = $('#pfName', el).value.trim();
+      if (!name) { showErr('Coloca seu nome.'); return; }
+      if (S.people.some((p) => p.id !== m.id && p.name.toLowerCase() === name.toLowerCase())) { showErr(`Já tem um ${name} no desafio. Use o sobrenome junto.`); return; }
+      const btn = $('#pfSave', el); btn.disabled = true; btn.textContent = 'Salvando…';
+      try {
+        const patch = { name };
+        if (blob) patch.photo_url = await uploadPhoto(blob, 'perfil');
+        const { error } = await db.from('participants').update(patch).eq('id', m.id);
+        if (error) throw error;
+        await load(); close(); toast('Perfil atualizado.'); render();
+      } catch (x) { console.error(x); showErr('Não deu pra salvar. Tenta de novo.'); btn.disabled = false; btn.textContent = 'Salvar'; }
+    };
+    let armed = false;
+    $('#pfOut', el).onclick = (e) => {
+      if (!armed) { armed = true; e.target.textContent = `Toque de novo pra sair da conta de ${m.name}`; return; }
+      setMe(null); close(); go('#/entrar');
+    };
   }
 
   function zoom(src) {
