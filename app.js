@@ -292,7 +292,7 @@
     return `
       <a class="task ${l ? 'done' : ''}" href="#/leitura/${day}">
         <div class="ic">${l ? ICON.check : ICON.book}</div>
-        <div class="grow"><div class="t1">ESPÍRITO · ${l ? 'FEITO' : '1 PONTO'}</div><div class="t2">${chaptersLabel(day)}</div><div class="t3">${l ? 'Leitura marcada. Toque pra ver a conversa.' : (c.length > 1 ? 'Dia de capítulo duplo · NVI' : 'Nova Versão Internacional')}</div></div>
+        <div class="grow"><div class="t1">ESPÍRITO · ${l ? 'FEITO' : '1 PONTO'}</div><div class="t2">${chaptersLabel(day)}</div><div class="t3">${l ? 'Leitura marcada. Toque pra ver a conversa.' : (c.length > 1 ? 'Dia de capítulo duplo' : 'Toque pra ler aqui no app')}</div></div>
         ${l ? '' : '<div class="go">Ler</div>'}
       </a>
       <a class="task ${t ? 'done' : ''}" href="#/treino/${day}">
@@ -368,7 +368,7 @@
     const thread = S.comments.filter((c) => c.day === day);
     app.innerHTML = `
       <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a>
-        <div class="grow"><div class="kicker">DIA ${day} · ${dayLabel(day).toUpperCase()}${chs.length > 1 ? ' · DUPLO' : ''}</div><div style="font-size:18px;font-weight:700">${chaptersLabel(day)} · NVI</div></div></div>
+        <div class="grow"><div class="kicker">DIA ${day} · ${dayLabel(day).toUpperCase()}${chs.length > 1 ? ' · DUPLO' : ''}</div><div style="font-size:18px;font-weight:700">${chaptersLabel(day)}</div></div></div>
       <div class="stack" style="padding-top:8px">
         <article class="texto" id="texto"><div class="small">Carregando o capítulo…</div></article>
         <div class="fonte">Texto: Bíblia Livre (BLIVRE), CC BY 4.0 · Prefere a NVI? ${chs.map((c) => `<a href="${nviUrl(c)}" target="_blank" rel="noopener">Provérbios ${c}</a>`).join(' e ')}</div>
