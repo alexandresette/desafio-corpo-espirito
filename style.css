@@ -217,3 +217,7 @@ button.tag { border: 0; cursor: pointer; }
 /* Escrevendo comentário: esconde o menu de baixo pra sobrar espaço acima do teclado */
 body.typing #tabs { display: none; }
 .composer { scroll-margin-bottom: 16px; }
+
+/* Curtir treino: coração embaixo da foto, legenda ao lado */
+.post .acts { display: flex; align-items: flex-start; gap: 6px; padding: 6px 14px 12px 6px; font-size: 15px; line-height: 1.4; }
+.post .acts .grow { padding-top: 8px; }

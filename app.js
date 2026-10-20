@@ -214,45 +214,48 @@
   const person = (id) => S.people.find((p) => p.id === id);
 
   async function load() {
-    const [p, c, m, l] = await Promise.all([
+    const [p, c, m, l, tl] = await Promise.all([
       db.from('participants').select('id,name,photo_url,pin_hash,created_at').order('created_at'),
       db.from('checkins').select('*').order('created_at', { ascending: false }),
       db.from('comments').select('*').order('created_at'),
-      db.from('likes').select('comment_id,participant_id')
+      db.from('likes').select('comment_id,participant_id'),
+      db.from('checkin_likes').select('checkin_id,participant_id')
     ]);
     const err = p.error || c.error || m.error;
     if (err) throw err;
-    S.people = p.data; S.checkins = c.data; S.comments = m.data; S.likes = l.error ? [] : l.data; S.loaded = true;
+    S.people = p.data; S.checkins = c.data; S.comments = m.data; S.likes = l.error ? [] : l.data; S.tlikes = tl.error ? [] : tl.data; S.loaded = true;
   }
 
-  // ---------- curtidas ----------
-  const likesOf = (cid) => (S.likes || []).filter((x) => x.comment_id === cid);
-  const likedByMe = (cid) => likesOf(cid).some((x) => x.participant_id === meId());
-  const likeBtn = (cid) => {
-    const n = likesOf(cid).length, on = likedByMe(cid);
-    return `<button class="like${on ? ' on' : ''}" type="button" data-like="${cid}" aria-pressed="${on}" aria-label="${on ? 'Descurtir' : 'Curtir'} comentário">${ICON.heart}<span>${n || ''}</span></button>`;
+  // ---------- curtidas (comentários: data-like, treinos: data-tlike) ----------
+  const LK = {
+    c: { attr: 'like', key: 'comment_id', table: 'likes', what: 'comentário', get: () => S.likes || [], set: (v) => { S.likes = v; } },
+    t: { attr: 'tlike', key: 'checkin_id', table: 'checkin_likes', what: 'treino', get: () => S.tlikes || [], set: (v) => { S.tlikes = v; } }
   };
+  const likesOfK = (k, id) => LK[k].get().filter((x) => x[LK[k].key] === id);
+  const likesOf = (cid) => likesOfK('c', cid);
+  const likedByMeK = (k, id) => likesOfK(k, id).some((x) => x.participant_id === meId());
+  const likeBtnK = (k, id) => {
+    const n = likesOfK(k, id).length, on = likedByMeK(k, id);
+    return `<button class="like${on ? ' on' : ''}" type="button" data-${LK[k].attr}="${id}" aria-pressed="${on}" aria-label="${on ? 'Descurtir' : 'Curtir'} ${LK[k].what}">${ICON.heart}<span>${n || ''}</span></button>`;
+  };
+  const likeBtn = (cid) => likeBtnK('c', cid);
+  const treinoLike = (id) => likeBtnK('t', id);
   // comentário mais curtido do dia (empate: o mais antigo)
   const topComment = (day) => S.comments.filter((c) => c.day === day)
     .map((c) => ({ c, n: likesOf(c.id).length }))
     .sort((a, b) => b.n - a.n || new Date(a.c.created_at) - new Date(b.c.created_at))[0] || null;
   document.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-like]'); if (!b) return;
+    const b = e.target.closest('[data-like],[data-tlike]'); if (!b) return;
     e.preventDefault(); e.stopPropagation();
     const mid = meId(); if (!mid) return;
-    const cid = b.dataset.like, on = likedByMe(cid);
-    const paint = () => $$(`[data-like="${cid}"]`).forEach((el) => { el.outerHTML = likeBtn(cid); });
-    if (on) S.likes = S.likes.filter((x) => !(x.comment_id === cid && x.participant_id === mid));
-    else S.likes.push({ comment_id: cid, participant_id: mid });
-    paint();
-    const { error } = on
-      ? await db.from('likes').delete().match({ comment_id: cid, participant_id: mid })
-      : await db.from('likes').insert({ comment_id: cid, participant_id: mid });
-    if (error && error.code !== '23505') {
-      if (on) S.likes.push({ comment_id: cid, participant_id: mid });
-      else S.likes = S.likes.filter((x) => !(x.comment_id === cid && x.participant_id === mid));
-      paint(); toast('Não deu pra curtir agora.');
-    }
+    const k = b.dataset.tlike ? 't' : 'c', L = LK[k], id = b.dataset[L.attr], on = likedByMeK(k, id);
+    const row = { [L.key]: id, participant_id: mid };
+    const drop = () => L.set(L.get().filter((x) => !(x[L.key] === id && x.participant_id === mid)));
+    const add = () => L.set([...L.get(), row]);
+    const paint = () => $$(`[data-${L.attr}="${id}"]`).forEach((el) => { el.outerHTML = likeBtnK(k, id); });
+    on ? drop() : add(); paint();
+    const { error } = on ? await db.from(L.table).delete().match(row) : await db.from(L.table).insert(row);
+    if (error && error.code !== '23505') { on ? add() : drop(); paint(); toast('Não deu pra curtir agora.'); }
   });
 
   async function uploadPhoto(blob, folder) {
@@ -278,10 +281,12 @@
     let d = Math.min(todayIdx(), TOTAL_DAYS);
     if (d >= 1 && !fullDay(pid, d)) d--;
     while (d >= 1 && fullDay(pid, d)) { streak++; d--; }
-    return { pid, total: leituras + treinos, leituras, treinos, full, streak };
+    // quando chegou na pontuação atual: horário do último check-in (sem pontos = fim da fila)
+    const reachedAt = mine.length ? Math.max(...mine.map((c) => new Date(c.created_at).getTime())) : Infinity;
+    return { pid, total: leituras + treinos, leituras, treinos, full, streak, reachedAt };
   }
   function ranking() {
-    return S.people.map((p) => scoreOf(p.id)).sort((a, b) => b.total - a.total || b.full - a.full || b.streak - a.streak);
+    return S.people.map((p) => scoreOf(p.id)).sort((a, b) => b.total - a.total || a.reachedAt - b.reachedAt);
   }
 
   // ---------- telas ----------
@@ -614,7 +619,7 @@
       app.innerHTML = `
         <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a><h1>TREINO DO DIA ${day}</h1></div>
         <div class="post">${done.photo_url ? `<img class="ph" src="${esc(done.photo_url)}" alt="Foto do treino">` : ''}
-          <div class="body"><b>${esc(done.activity)} · ${done.minutes} min</b>${done.caption ? `<br>${esc(done.caption)}` : ''}</div></div>`;
+          <div class="acts">${treinoLike(done.id)}<div class="grow"><b>${esc(done.activity)} · ${done.minutes} min</b>${done.caption ? `<br>${esc(done.caption)}` : ''}</div></div></div>`;
       return;
     }
     if (!canMark(day)) {
@@ -711,7 +716,7 @@
           return `<div class="post">
               <div class="head">${avatar(p, 36)}<div class="grow"><b>${esc(p?.name)}</b><div class="small">${esc(it.activity)} · ${it.minutes} min</div></div><span class="small">${timeAgo(it.created_at)}</span></div>
               ${it.photo_url ? `<img class="ph" src="${esc(it.photo_url)}" alt="Treino de ${esc(p?.name)}" loading="lazy">` : ''}
-              ${it.caption ? `<div class="body">${esc(it.caption)}</div>` : ''}
+              <div class="acts">${treinoLike(it.id)}${it.caption ? `<div class="grow">${esc(it.caption)}</div>` : ''}</div>
             </div>`;
         }).join('') : '<div class="card sub">Ninguém postou treino nesse dia ainda.</div>'}
         <div class="section-title">Comentários da leitura <span class="small">(${coments.length})</span></div>

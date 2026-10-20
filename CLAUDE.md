@@ -2,7 +2,7 @@
 
 Arquivo vivo. Toda conversa nova começa lendo este arquivo e termina atualizando a seção "Diário de mudanças" e o que mais tiver mudado. Fonte da verdade: este arquivo dentro do repositório `alexandresette/desafio-corpo-espirito`.
 
-Última atualização: 20/10/2026 (v=15)
+Última atualização: 20/10/2026 (v=16)
 
 ## 1. O que é
 
@@ -24,7 +24,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - Pontos: 1 leitura + 1 treino por dia, máximo 56.
 - Treino: mínimo 30 min, foto obrigatória, tipo (Caminhada, Corrida, Academia, Outro), legenda opcional.
 - Prazo: dá pra marcar o dia de hoje e o de ontem (`canMark`).
-- Desempate: mais dias completos, depois maior sequência.
+- Desempate (desde v=16, pedido do Xande): com os mesmos pontos, fica na frente quem chegou nessa pontuação primeiro, ou seja, quem tem o último check-in mais antigo (`reachedAt` em `scoreOf`). Antes era dias completos e depois sequência.
 
 ## 3. Stack e infraestrutura
 
@@ -39,6 +39,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
   - `checkins` (participant_id, day 1..28, kind 'leitura'|'treino', activity, minutes, photo_url, caption; único por pessoa+dia+tipo)
   - `comments` (participant_id, day, body)
   - `likes` (comment_id, participant_id; chave primária dupla)
+  - `checkin_likes` (checkin_id, participant_id; chave primária dupla), curtidas nas fotos de treino
   - bucket público `fotos` (pastas `perfil/` e `treinos/`)
   - RLS ligado com política aberta pra `anon` (grupo interno de amigos, decisão consciente).
 - Libs externas: `@supabase/supabase-js@2` (jsdelivr) e `heic2any@0.0.4` (carregada só quando a foto é HEIC).
@@ -68,7 +69,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - `visibilitychange`: só recarrega dados e redesenha em telas de leitura (hoje, mural, ranking, calendário), nunca em formulário.
 - Auto-atualização: `MY_V` lê o `?v=N` do próprio `app.js`; ao abrir e ao voltar pro app, busca o `index.html` sem cache e, se o número mudou, recarrega com `?v=N` (exceto no meio de cadastro, treino ou com enquadramento aberto).
 - Fotos: `pickPhoto()` = `decodeAny()` (createImageBitmap, depois `<img>`, depois heic2any) → `limitSize()` (máx 2000 px) → `cropImage()` (tela "Ajuste a foto": arrastar, zoom por controle e pinça) → JPEG. Se nada abrir a imagem, aceita o arquivo original pra não travar o cadastro.
-- Curtidas: clique delegado em `[data-like]`, atualização otimista.
+- Curtidas: clique delegado em `[data-like]` (comentários) e `[data-tlike]` (treinos), mesma função com a config `LK` (tabela, coluna, lista em `S.likes`/`S.tlikes`), atualização otimista.
 
 ## 6. Como publicar uma mudança (fluxo que funciona)
 
@@ -115,7 +116,6 @@ Observações de ambiente (aprendidas):
 
 - [ ] Lembrete diário (notificação ou mensagem no WhatsApp) pra quem não marcou o dia.
 - [ ] Montagem semanal / final do desafio com estatísticas do grupo.
-- [ ] Reações nos treinos (hoje só comentários têm curtida).
 - [ ] Painel do líder: ver quem não marcou nada há 2 dias.
 - [ ] NVI dentro do app via YouVersion Platform, se a licença permitir.
 - [ ] Prévia do link no WhatsApp com imagem (`og:image`).
@@ -124,6 +124,7 @@ Observações de ambiente (aprendidas):
 
 Formato: data · versão · o que mudou · por quê. Mais recente em cima.
 
+- 20/10/2026 · v=16 · Curtir foto de treino (coração embaixo da foto no mural e na tela do treino, tabela `checkin_likes`); empate no ranking decidido por quem chegou na pontuação mais cedo.
 - 20/10/2026 · v=15 · Comentário longo não some mais atrás do teclado: a tela rola junto com o texto (`visualViewport`) e o menu de baixo se esconde enquanto o campo está em foco (`body.typing`).
 - 19/10/2026 · v=14 · Pódio do ranking mostra leituras e treinos dos 3 primeiros.
 - 19/10/2026 · v=13 · `DRAFT` pra foto/nome sobreviverem à tela recriada; auto-atualização do app; erro de cadastro visível; fallback de `randomUUID`.

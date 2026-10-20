@@ -59,3 +59,14 @@ create table if not exists likes (
 alter table likes enable row level security;
 create policy "aberto" on likes for all to anon using (true) with check (true);
 grant select, insert, delete on likes to anon;
+
+-- v=16: curtidas nas fotos de treino
+create table if not exists checkin_likes (
+  checkin_id uuid not null references checkins(id) on delete cascade,
+  participant_id uuid not null references participants(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (checkin_id, participant_id)
+);
+alter table checkin_likes enable row level security;
+create policy "aberto" on checkin_likes for all to anon using (true) with check (true);
+grant select, insert, delete on checkin_likes to anon;
