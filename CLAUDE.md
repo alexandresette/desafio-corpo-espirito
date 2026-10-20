@@ -2,7 +2,7 @@
 
 Arquivo vivo. Toda conversa nova começa lendo este arquivo e termina atualizando a seção "Diário de mudanças" e o que mais tiver mudado. Fonte da verdade: este arquivo dentro do repositório `alexandresette/desafio-corpo-espirito`.
 
-Última atualização: 19/10/2026 (v=14)
+Última atualização: 20/10/2026 (v=15)
 
 ## 1. O que é
 
@@ -94,6 +94,7 @@ Observações de ambiente (aprendidas):
 - iPhone não aceita ícone SVG na tela inicial: usar PNG (`assets/icon-180.png`, `icon-192.png`, `icon-512.png`). Ícone: sol dourado sobre livro aberto, fundo oliva.
 - `navigator.share` precisa de toque recente do usuário: gerar a montagem primeiro, mostrar prévia e só compartilhar num segundo toque.
 - Nunca usar `alert`/`confirm` (trava o navegador automatizado e é feio no celular); confirmar com segundo toque.
+- Campo de texto no fim da tela: o teclado do celular cobre o que cresce. Rolar com base em `window.visualViewport` (altura visível real) a cada `input` e no `resize` do viewport, e esconder o menu fixo durante o foco.
 - Link do app deve ser aberto no Safari/Chrome, não dentro do WhatsApp (galeria pode não abrir).
 
 ## 8. Identidade visual
@@ -123,6 +124,7 @@ Observações de ambiente (aprendidas):
 
 Formato: data · versão · o que mudou · por quê. Mais recente em cima.
 
+- 20/10/2026 · v=15 · Comentário longo não some mais atrás do teclado: a tela rola junto com o texto (`visualViewport`) e o menu de baixo se esconde enquanto o campo está em foco (`body.typing`).
 - 19/10/2026 · v=14 · Pódio do ranking mostra leituras e treinos dos 3 primeiros.
 - 19/10/2026 · v=13 · `DRAFT` pra foto/nome sobreviverem à tela recriada; auto-atualização do app; erro de cadastro visível; fallback de `randomUUID`.
 - 19/10/2026 · v=12 · Mural por dia com setas; curtidas em comentários (tabela `likes`); montagem do dia pra compartilhar.

@@ -582,7 +582,18 @@
     };
     const cm = $('#cm');
     if (cm) {
-      cm.addEventListener('input', () => { cm.style.height = 'auto'; cm.style.height = Math.min(cm.scrollHeight, 160) + 'px'; });
+      // Mantém o campo visível acima do teclado enquanto o texto cresce
+      const keepVisible = () => requestAnimationFrame(() => {
+        const box = cm.closest('.composer') || cm;
+        const vv = window.visualViewport;
+        const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+        const r = box.getBoundingClientRect();
+        if (r.bottom > bottom - 12) window.scrollBy(0, r.bottom - bottom + 16);
+      });
+      const grow = () => { cm.style.height = 'auto'; cm.style.height = Math.min(cm.scrollHeight, 160) + 'px'; keepVisible(); };
+      cm.addEventListener('input', grow);
+      cm.addEventListener('focus', () => { document.body.classList.add('typing'); window.visualViewport?.addEventListener('resize', keepVisible); setTimeout(keepVisible, 300); });
+      cm.addEventListener('blur', () => { document.body.classList.remove('typing'); window.visualViewport?.removeEventListener('resize', keepVisible); });
       $('#send').onclick = async () => {
         const body = cm.value.trim(); if (!body) return;
         $('#send').disabled = true;

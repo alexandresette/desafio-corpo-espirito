@@ -213,3 +213,7 @@ button.tag { border: 0; cursor: pointer; }
 .com-body { display: block; color: var(--ink); text-decoration: none; font-size: 15px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; margin-top: 2px; }
 .btn.gold svg { stroke: var(--ink); }
 .podium .p .split { font-size: 12px; line-height: 1.35; color: var(--line-2); text-align: center; margin-top: -2px; }
+
+/* Escrevendo comentário: esconde o menu de baixo pra sobrar espaço acima do teclado */
+body.typing #tabs { display: none; }
+.composer { scroll-margin-bottom: 16px; }
