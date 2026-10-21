@@ -517,7 +517,7 @@
             return `<span title="${esc(p.name)}" style="border-radius:50%;outline:2.5px solid ${f ? 'var(--gold)' : 'transparent'};outline-offset:2px;${f ? '' : 'opacity:.45'}">${avatar(p, 34)}</span>`;
           }).join('')}</div>
         </div>
-        ${(() => { const d = dicasAte(t)[0]; return d ? `<div class="section-title">Dicas da Nutri Jake</div>${dicaCard(d, true).replace('<article', '<a href="#/nutri"').replace('</article>', '<span class="dica-mais">Ver todas as dicas</span></a>')}` : ''; })()}`;
+        ${(() => { const d = dicasAte(t)[0]; return d ? `<div class="section-title">Dicas da Nutri</div>${dicaCard(d, true).replace('<article', '<a href="#/nutri"').replace('</article>', '<span class="dica-mais">Ver todas as dicas</span></a>')}` : ''; })()}`;
     }
     app.innerHTML = `
       <div class="stack" style="padding-top:22px">
