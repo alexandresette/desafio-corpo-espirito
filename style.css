@@ -234,3 +234,4 @@ body.typing #tabs { display: none; }
 .dica-share { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1.5px solid var(--olive); background: transparent; color: var(--olive); font: 700 14px Figtree, sans-serif; cursor: pointer; }
 .dica-share svg { width: 18px; height: 18px; }
 #tabs a { font-size: 11px; }
+.hoje-marca { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: .04em; color: var(--clay); line-height: 1; }

@@ -525,7 +525,7 @@
     }
     app.innerHTML = `
       <div class="stack" style="padding-top:22px">
-        <div class="row"><div class="grow stack" style="gap:4px">${head}</div>
+        <div class="row"><div class="grow stack" style="gap:4px"><div class="hoje-marca">DESAFIO CORPO E ESPÍRITO</div>${head}</div>
           <button class="icon-btn" id="profile" aria-label="Minha conta" style="margin:0">${avatar(m, 44)}</button></div>
         <div class="progress" aria-label="Progresso do desafio"><div style="width:${Math.max(0, Math.min(100, (t / TOTAL_DAYS) * 100))}%"></div></div>
         <div class="stats">

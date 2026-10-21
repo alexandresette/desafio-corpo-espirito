@@ -2,7 +2,7 @@
 
 Arquivo vivo. Toda conversa nova começa lendo este arquivo e termina atualizando a seção "Diário de mudanças" e o que mais tiver mudado. Fonte da verdade: este arquivo dentro do repositório `alexandresette/desafio-corpo-espirito`.
 
-Última atualização: 21/10/2026 (v=19)
+Última atualização: 21/10/2026 (v=20)
 
 ## 1. O que é
 
@@ -50,7 +50,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - `#/entrar`: botão "Criar meu acesso" + grade de fotos dos participantes, toca na foto e digita o PIN. "Esqueci meu PIN".
 - `#/cadastro`: foto obrigatória (com enquadramento), primeiro nome, PIN de 4 números + confirmação. Mostra o que falta ("Falta: foto e PIN").
 - `#/trocar-pin`: a própria pessoa toca na foto e cria um PIN novo (sem palavra secreta, decisão do Xande: grupo de amigos).
-- `#/hoje`: dia X de 28, barra de progresso, pontos, sequência, posição, as duas tarefas, aviso de "ontem ficou faltando", quem fechou o dia, e embaixo a seção "Dicas da Nutri" com a dica mais recente (o balão mostra "Nutri Jake" e a foto dela) (toque abre `#/nutri`). Tocar no próprio avatar abre "Meu perfil".
+- `#/hoje`: título "DESAFIO CORPO E ESPÍRITO" acima da data, dia X de 28, barra de progresso, pontos, sequência, posição, as duas tarefas, aviso de "ontem ficou faltando", quem fechou o dia, e embaixo a seção "Dicas da Nutri" com a dica mais recente (o balão mostra "Nutri Jake" e a foto dela) (toque abre `#/nutri`). Tocar no próprio avatar abre "Meu perfil".
 - `#/nutri`: mural da nutricionista do GC (Nutri Jake). Todas as dicas já liberadas, da mais nova pra mais antiga, com a foto de perfil dela.
 - Compartilhar dica (botão em cada balão, no Hoje e na Nutri): gera imagem 1080x1350 (foto da Jake, título, texto, rodapé do desafio), mostra prévia e compartilha no segundo toque, com legenda junto quando o app aceita.
 - Meu perfil (modal): ajustar enquadramento da foto atual, escolher outra foto, mudar nome, salvar, sair da conta (pede segundo toque).
@@ -134,6 +134,7 @@ Observações de ambiente (aprendidas):
 
 Formato: data · versão · o que mudou · por quê. Mais recente em cima.
 
+- 21/10/2026 · v=20 · Título "DESAFIO CORPO E ESPÍRITO" no topo do Hoje, acima da data. Pedido do Xande: faltava o nome do desafio na tela principal.
 - 21/10/2026 · v=19 · Botão Compartilhar em cada dica da Nutri: gera imagem 1080x1350 com a foto da Jake e o texto, pronta pro WhatsApp. Prévia da montagem virou função genérica (`sharePreview`). Pedido do Xande.
 - 21/10/2026 · v=18 · Título da seção no Hoje encurtado pra "Dicas da Nutri"; o nome "Nutri Jake" fica só dentro do balão. Pedido do Xande pra não repetir o nome.
 - 21/10/2026 · v=17 · Dicas da Nutri Jake: card com a dica do dia no Hoje e nova aba Nutri no menu (mural com as dicas, mais nova em cima). 7 dicas agendadas em `dicas.js`, uma por dia do dia 3 ao 9. Pedido do Xande pra dar espaço à nutricionista do GC.
