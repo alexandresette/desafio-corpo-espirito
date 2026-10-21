@@ -2,7 +2,7 @@
 
 Arquivo vivo. Toda conversa nova começa lendo este arquivo e termina atualizando a seção "Diário de mudanças" e o que mais tiver mudado. Fonte da verdade: este arquivo dentro do repositório `alexandresette/desafio-corpo-espirito`.
 
-Última atualização: 21/10/2026 (v=20)
+Última atualização: 21/10/2026 (v=21)
 
 ## 1. O que é
 
@@ -58,7 +58,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - `#/treino/N`: foto (com enquadramento 4:5), tipo, minutos (stepper de 5 em 5, mínimo 30), legenda, postar.
 - `#/mural/N`: faixa com o dia e setas (abre no dia de hoje, setas pra dias anteriores), botão "Compartilhar montagem do dia", comentário mais curtido em destaque, treinos do dia, comentários do dia com coração.
 - Montagem do dia: imagem 1080x1350 gerada no navegador (canvas) com até 16 fotos de treino com nome + comentário mais curtido. Prévia com "Compartilhar" (Web Share API) e "Salvar imagem".
-- `#/ranking`: pódio com pontos, leituras e treinos dos 3 primeiros; lista do 4º em diante.
+- `#/ranking`: pódio dos 3 primeiros (na base, colocação grande em cima e pontos menores embaixo; acima, leituras e treinos); lista do 4º em diante; rodapé explica o desempate.
 - `#/calendario/N`: grade dos 28 dias colorida por % do grupo que completou; tocar no dia mostra cada pessoa com Leitura/Treino (tocar no treino abre a foto).
 - Menu de baixo com ícones de linha: Hoje, Mural, Nutri, Ranking, Calendário.
 
@@ -104,6 +104,7 @@ Observações de ambiente (aprendidas):
 - Link do app deve ser aberto no Safari/Chrome, não dentro do WhatsApp (galeria pode não abrir).
 - Dicas da Nutri ficam num arquivo do repo, não no Supabase (v=17): agendar por dia sem tabela nova nem SQL. A Jake não posta sozinha; ela manda no grupo e o Xande pede pro Claude reescrever curto e agendar. Se ela quiser postar direto, aí sim criar tabela `dicas` e uma tela de postagem só pra ela.
 - Balão da dica no Hoje deixou de ser um link inteiro (v=19): não dá pra pôr botão dentro de `<a>`. Agora é `<article>` com "Ver todas as dicas" e "Compartilhar" embaixo.
+- Ao mudar uma regra, procurar o texto da tela que explica a regra: o rodapé do ranking ficou falando do desempate antigo de v=16 até v=21.
 - Texto das dicas: reescrito curto a partir do que a Jake mandou no grupo, sem acrescentar afirmação de saúde que ela não fez.
 
 ## 8. Identidade visual
@@ -134,6 +135,7 @@ Observações de ambiente (aprendidas):
 
 Formato: data · versão · o que mudou · por quê. Mais recente em cima.
 
+- 21/10/2026 · v=21 · Pódio do ranking: colocação (1º, 2º, 3º) grande em cima e pontuação menor embaixo, pedido do Xande. Rodapé corrigido pro desempate atual (quem chegou primeiro na pontuação).
 - 21/10/2026 · v=20 · Título "DESAFIO CORPO E ESPÍRITO" no topo do Hoje, acima da data. Pedido do Xande: faltava o nome do desafio na tela principal.
 - 21/10/2026 · v=19 · Botão Compartilhar em cada dica da Nutri: gera imagem 1080x1350 com a foto da Jake e o texto, pronta pro WhatsApp. Prévia da montagem virou função genérica (`sharePreview`). Pedido do Xande.
 - 21/10/2026 · v=18 · Título da seção no Hoje encurtado pra "Dicas da Nutri"; o nome "Nutri Jake" fica só dentro do balão. Pedido do Xande pra não repetir o nome.

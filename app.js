@@ -945,7 +945,7 @@
         ${r.length ? `<div class="podium">${order.map((s, i) => s ? `
           <div class="p">${avatar(person(s.pid), sizes[i])}<div class="nm">${esc(person(s.pid).name)}</div>
             <div class="split">${s.leituras} ${s.leituras === 1 ? 'leitura' : 'leituras'}<br>${s.treinos} ${s.treinos === 1 ? 'treino' : 'treinos'}</div>
-            <div class="base" style="height:${heights[i]}px"><b>${s.total}</b><span>${labels[i]}</span></div></div>` : '<div></div>').join('')}</div>` : ''}
+            <div class="base" style="height:${heights[i]}px"><b>${labels[i]}</b><span>${s.total} ${s.total === 1 ? 'ponto' : 'pontos'}</span></div></div>` : '<div></div>').join('')}</div>` : ''}
       </div>
       <div class="stack" style="gap:8px;padding-top:16px">
         ${r.slice(3).map((s, i) => {
@@ -953,7 +953,7 @@
           return `<div class="rank-row ${s.pid === m.id ? 'me' : ''}"><div class="pos">${i + 4}º</div>${avatar(p, 36)}
             <div class="grow"><div style="font-weight:700">${esc(p.name)}</div><div class="small">${s.leituras} leituras · ${s.treinos} treinos</div></div><div class="pts">${s.total}</div></div>`;
         }).join('')}
-        <div class="small center" style="padding-top:4px">Empate se resolve por dias completos e depois pela sequência.</div>
+        <div class="small center" style="padding-top:4px">Empate: fica na frente quem chegou primeiro na pontuação.</div>
       </div>`;
   });
 
