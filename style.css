@@ -148,7 +148,7 @@ button.tag { border: 0; cursor: pointer; }
 .post .body { padding: 10px 14px 14px; font-size: 15px; line-height: 1.4; }
 
 /* tabs */
-#tabs { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--paper); border-top: 1px solid var(--line); padding: 6px 6px calc(8px + env(safe-area-inset-bottom)); z-index: 10; }
+#tabs { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--paper); border-top: 1px solid var(--line); padding: 6px 6px calc(8px + env(safe-area-inset-bottom)); z-index: 10; }
 #tabs a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 48px; text-decoration: none; font-size: 12px; font-weight: 500; color: var(--muted-2); }
 #tabs a::before { content: ''; width: 6px; height: 6px; border-radius: 3px; background: transparent; }
 #tabs a.on { color: var(--olive); font-weight: 700; }
@@ -221,3 +221,13 @@ body.typing #tabs { display: none; }
 /* Curtir treino: coração embaixo da foto, legenda ao lado */
 .post .acts { display: flex; align-items: flex-start; gap: 6px; padding: 6px 14px 12px 6px; font-size: 15px; line-height: 1.4; }
 .post .acts .grow { padding-top: 8px; }
+
+/* dicas da nutri */
+.dica { display: block; background: var(--paper); border-radius: 20px; padding: 16px; border: 1.5px solid var(--line); text-decoration: none; color: var(--ink); }
+.dica.nova { border-color: var(--gold-soft); background: #FFF8EA; }
+.dica-top { display: flex; align-items: center; gap: 10px; }
+.dica-quem { font-weight: 700; }
+.dica-tit { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 21px; line-height: 1.15; margin-top: 12px; text-transform: uppercase; color: var(--olive); }
+.dica-txt { margin: 6px 0 0; line-height: 1.5; }
+.dica-mais { display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 700; color: var(--clay); }
+#tabs a { font-size: 11px; }

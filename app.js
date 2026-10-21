@@ -463,6 +463,15 @@
     };
   });
 
+  // --- dicas da nutri (dicas.js) ---
+  const nutri = () => S.people.find((p) => /^jake/i.test(String(p.name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()));
+  const dicasAte = (day) => (window.DICAS || []).filter((d) => d.dia <= day).sort((a, b) => b.dia - a.dia);
+  const dicaCard = (d, destaque) => `
+      <article class="dica${destaque ? ' nova' : ''}">
+        <div class="dica-top">${avatar(nutri(), destaque ? 40 : 32)}<div class="grow"><div class="dica-quem">Nutri Jake</div><div class="small">${destaque ? 'Dica de hoje' : `Dia ${d.dia} · ${shortDate(d.dia)}`}</div></div></div>
+        <div class="dica-tit">${esc(d.titulo)}</div>
+        <p class="dica-txt">${esc(d.texto)}</p>
+      </article>`;
   // --- hoje ---
   function taskCards(day, pid) {
     const l = has(pid, day, 'leitura'), t = has(pid, day, 'treino');
@@ -507,7 +516,8 @@
             const f = fullDay(p.id, t);
             return `<span title="${esc(p.name)}" style="border-radius:50%;outline:2.5px solid ${f ? 'var(--gold)' : 'transparent'};outline-offset:2px;${f ? '' : 'opacity:.45'}">${avatar(p, 34)}</span>`;
           }).join('')}</div>
-        </div>`;
+        </div>
+        ${(() => { const d = dicasAte(t)[0]; return d ? `<div class="section-title">Dicas da Nutri Jake</div>${dicaCard(d, true).replace('<article', '<a href="#/nutri"').replace('</article>', '<span class="dica-mais">Ver todas as dicas</span></a>')}` : ''; })()}`;
     }
     app.innerHTML = `
       <div class="stack" style="padding-top:22px">
@@ -522,6 +532,18 @@
         ${body}
       </div>`;
     $('#profile').onclick = openProfile;
+  });
+
+  // --- mural da nutri ---
+  route('nutri', () => {
+    shell(true, 'nutri');
+    const lista = dicasAte(currentDay());
+    const n = nutri();
+    app.innerHTML = `
+      <div class="stack" style="padding-top:22px">
+        <div class="row" style="gap:14px">${avatar(n, 56)}<div class="grow stack" style="gap:2px"><h1 style="font-size:34px">NUTRI JAKE</h1><div class="sub">Uma dica nova por dia pra cuidar do corpo</div></div></div>
+        ${lista.length ? lista.map((d, i) => dicaCard(d, i === 0 && d.dia === todayIdx())).join('') : '<div class="card sub">A primeira dica chega em breve.</div>'}
+      </div>`;
   });
 
   // --- dia (atalho pra marcar ontem) ---
@@ -1041,7 +1063,7 @@
     // Só atualiza telas de leitura. Formulários (cadastro, treino, leitura com comentário)
     // não podem ser recriados: abrir a galeria também esconde a página.
     const name = location.hash.replace(/^#\/?/, '').split('/')[0] || 'hoje';
-    const safe = ['hoje', 'mural', 'ranking', 'calendario'].includes(name);
+    const safe = ['hoje', 'mural', 'nutri', 'ranking', 'calendario'].includes(name);
     const busy = document.querySelector('.cropper') || (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName));
     if (!safe || busy || !me()) return;
     try { await load(); if (!document.querySelector('.cropper')) render(); } catch { /* sem rede */ }

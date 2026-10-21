@@ -2,7 +2,7 @@
 
 Arquivo vivo. Toda conversa nova começa lendo este arquivo e termina atualizando a seção "Diário de mudanças" e o que mais tiver mudado. Fonte da verdade: este arquivo dentro do repositório `alexandresette/desafio-corpo-espirito`.
 
-Última atualização: 20/10/2026 (v=16)
+Última atualização: 21/10/2026 (v=17)
 
 ## 1. O que é
 
@@ -28,7 +28,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 
 ## 3. Stack e infraestrutura
 
-- Front estático, HTML + CSS + JS puro, sem build: `index.html`, `style.css`, `app.js`, `config.js`, `manifest.json`, `proverbios.json`, `assets/`.
+- Front estático, HTML + CSS + JS puro, sem build: `index.html`, `style.css`, `app.js`, `config.js`, `dicas.js`, `manifest.json`, `proverbios.json`, `assets/`.
 - Hospedagem: GitHub Pages, branch `main`, raiz.
 - Banco e fotos: Supabase, projeto `desafio-samambaia` (id `milezgzaycnmtgpzyxcu`, região São Paulo, plano grátis), na conta Supabase do Xande (login via GitHub `alexandresette`).
   - URL: `https://milezgzaycnmtgpzyxcu.supabase.co`
@@ -50,7 +50,8 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - `#/entrar`: botão "Criar meu acesso" + grade de fotos dos participantes, toca na foto e digita o PIN. "Esqueci meu PIN".
 - `#/cadastro`: foto obrigatória (com enquadramento), primeiro nome, PIN de 4 números + confirmação. Mostra o que falta ("Falta: foto e PIN").
 - `#/trocar-pin`: a própria pessoa toca na foto e cria um PIN novo (sem palavra secreta, decisão do Xande: grupo de amigos).
-- `#/hoje`: dia X de 28, barra de progresso, pontos, sequência, posição, as duas tarefas, aviso de "ontem ficou faltando", quem fechou o dia. Tocar no próprio avatar abre "Meu perfil".
+- `#/hoje`: dia X de 28, barra de progresso, pontos, sequência, posição, as duas tarefas, aviso de "ontem ficou faltando", quem fechou o dia, e embaixo "Dicas da Nutri Jake" com a dica mais recente (toque abre `#/nutri`). Tocar no próprio avatar abre "Meu perfil".
+- `#/nutri`: mural da nutricionista do GC (Nutri Jake). Todas as dicas já liberadas, da mais nova pra mais antiga, com a foto de perfil dela.
 - Meu perfil (modal): ajustar enquadramento da foto atual, escolher outra foto, mudar nome, salvar, sair da conta (pede segundo toque).
 - `#/leitura/N`: texto do capítulo dentro do app (Bíblia Livre), tocar em versículos seleciona e aparece barra "Copiar" com referência (ex.: "Provérbios 1:5-7,9 (Bíblia Livre)"), botão "Li o capítulo", conversa do dia com curtidas. Link "Prefere a NVI?" abre o Bible.com.
 - `#/treino/N`: foto (com enquadramento 4:5), tipo, minutos (stepper de 5 em 5, mínimo 30), legenda, postar.
@@ -58,7 +59,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - Montagem do dia: imagem 1080x1350 gerada no navegador (canvas) com até 16 fotos de treino com nome + comentário mais curtido. Prévia com "Compartilhar" (Web Share API) e "Salvar imagem".
 - `#/ranking`: pódio com pontos, leituras e treinos dos 3 primeiros; lista do 4º em diante.
 - `#/calendario/N`: grade dos 28 dias colorida por % do grupo que completou; tocar no dia mostra cada pessoa com Leitura/Treino (tocar no treino abre a foto).
-- Menu de baixo com ícones de linha: Hoje, Mural, Ranking, Calendário.
+- Menu de baixo com ícones de linha: Hoje, Mural, Nutri, Ranking, Calendário.
 
 ## 5. Arquitetura do `app.js` (pontos que importam)
 
@@ -70,6 +71,8 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - Auto-atualização: `MY_V` lê o `?v=N` do próprio `app.js`; ao abrir e ao voltar pro app, busca o `index.html` sem cache e, se o número mudou, recarrega com `?v=N` (exceto no meio de cadastro, treino ou com enquadramento aberto).
 - Fotos: `pickPhoto()` = `decodeAny()` (createImageBitmap, depois `<img>`, depois heic2any) → `limitSize()` (máx 2000 px) → `cropImage()` (tela "Ajuste a foto": arrastar, zoom por controle e pinça) → JPEG. Se nada abrir a imagem, aceita o arquivo original pra não travar o cadastro.
 - Curtidas: clique delegado em `[data-like]` (comentários) e `[data-tlike]` (treinos), mesma função com a config `LK` (tabela, coluna, lista em `S.likes`/`S.tlikes`), atualização otimista.
+
+- Dicas da Nutri: lista fixa em `dicas.js` (`window.DICAS`, cada item com `dia`, `titulo`, `texto`). Uma dica aparece a partir do dia do desafio em `dia` (agendamento sem backend). A foto vem do cadastro: `nutri()` acha a participante cujo nome começa com "Jake". Pra lançar dica nova: acrescentar item com o próximo dia livre e subir o `?v=N`.
 
 ## 6. Como publicar uma mudança (fluxo que funciona)
 
@@ -97,6 +100,8 @@ Observações de ambiente (aprendidas):
 - Nunca usar `alert`/`confirm` (trava o navegador automatizado e é feio no celular); confirmar com segundo toque.
 - Campo de texto no fim da tela: o teclado do celular cobre o que cresce. Rolar com base em `window.visualViewport` (altura visível real) a cada `input` e no `resize` do viewport, e esconder o menu fixo durante o foco.
 - Link do app deve ser aberto no Safari/Chrome, não dentro do WhatsApp (galeria pode não abrir).
+- Dicas da Nutri ficam num arquivo do repo, não no Supabase (v=17): agendar por dia sem tabela nova nem SQL. A Jake não posta sozinha; ela manda no grupo e o Xande pede pro Claude reescrever curto e agendar. Se ela quiser postar direto, aí sim criar tabela `dicas` e uma tela de postagem só pra ela.
+- Texto das dicas: reescrito curto a partir do que a Jake mandou no grupo, sem acrescentar afirmação de saúde que ela não fez.
 
 ## 8. Identidade visual
 
@@ -119,11 +124,14 @@ Observações de ambiente (aprendidas):
 - [ ] Painel do líder: ver quem não marcou nada há 2 dias.
 - [ ] NVI dentro do app via YouVersion Platform, se a licença permitir.
 - [ ] Prévia do link no WhatsApp com imagem (`og:image`).
+- [ ] Dicas da Nutri agendadas até o dia 9 (27/out). Pedir mais dicas pra Jake antes disso.
+- [ ] Opcional: a Jake postar dica direto pelo app (tabela `dicas` + tela só pra ela).
 
 ## 11. Diário de mudanças
 
 Formato: data · versão · o que mudou · por quê. Mais recente em cima.
 
+- 21/10/2026 · v=17 · Dicas da Nutri Jake: card com a dica do dia no Hoje e nova aba Nutri no menu (mural com as dicas, mais nova em cima). 7 dicas agendadas em `dicas.js`, uma por dia do dia 3 ao 9. Pedido do Xande pra dar espaço à nutricionista do GC.
 - 20/10/2026 · v=16 · Curtir foto de treino (coração embaixo da foto no mural e na tela do treino, tabela `checkin_likes`); empate no ranking decidido por quem chegou na pontuação mais cedo.
 - 20/10/2026 · v=15 · Comentário longo não some mais atrás do teclado: a tela rola junto com o texto (`visualViewport`) e o menu de baixo se esconde enquanto o campo está em foco (`body.typing`).
 - 19/10/2026 · v=14 · Pódio do ranking mostra leituras e treinos dos 3 primeiros.
