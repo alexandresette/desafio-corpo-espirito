@@ -229,5 +229,8 @@ body.typing #tabs { display: none; }
 .dica-quem { font-weight: 700; }
 .dica-tit { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 21px; line-height: 1.15; margin-top: 12px; text-transform: uppercase; color: var(--olive); }
 .dica-txt { margin: 6px 0 0; line-height: 1.5; }
-.dica-mais { display: inline-block; margin-top: 10px; font-size: 14px; font-weight: 700; color: var(--clay); }
+.dica-acoes { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.dica-mais { font-size: 14px; font-weight: 700; color: var(--clay); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.dica-share { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1.5px solid var(--olive); background: transparent; color: var(--olive); font: 700 14px Figtree, sans-serif; cursor: pointer; }
+.dica-share svg { width: 18px; height: 18px; }
 #tabs a { font-size: 11px; }

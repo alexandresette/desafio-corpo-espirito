@@ -2,7 +2,7 @@
 
 Arquivo vivo. Toda conversa nova começa lendo este arquivo e termina atualizando a seção "Diário de mudanças" e o que mais tiver mudado. Fonte da verdade: este arquivo dentro do repositório `alexandresette/desafio-corpo-espirito`.
 
-Última atualização: 21/10/2026 (v=18)
+Última atualização: 21/10/2026 (v=19)
 
 ## 1. O que é
 
@@ -52,6 +52,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - `#/trocar-pin`: a própria pessoa toca na foto e cria um PIN novo (sem palavra secreta, decisão do Xande: grupo de amigos).
 - `#/hoje`: dia X de 28, barra de progresso, pontos, sequência, posição, as duas tarefas, aviso de "ontem ficou faltando", quem fechou o dia, e embaixo a seção "Dicas da Nutri" com a dica mais recente (o balão mostra "Nutri Jake" e a foto dela) (toque abre `#/nutri`). Tocar no próprio avatar abre "Meu perfil".
 - `#/nutri`: mural da nutricionista do GC (Nutri Jake). Todas as dicas já liberadas, da mais nova pra mais antiga, com a foto de perfil dela.
+- Compartilhar dica (botão em cada balão, no Hoje e na Nutri): gera imagem 1080x1350 (foto da Jake, título, texto, rodapé do desafio), mostra prévia e compartilha no segundo toque, com legenda junto quando o app aceita.
 - Meu perfil (modal): ajustar enquadramento da foto atual, escolher outra foto, mudar nome, salvar, sair da conta (pede segundo toque).
 - `#/leitura/N`: texto do capítulo dentro do app (Bíblia Livre), tocar em versículos seleciona e aparece barra "Copiar" com referência (ex.: "Provérbios 1:5-7,9 (Bíblia Livre)"), botão "Li o capítulo", conversa do dia com curtidas. Link "Prefere a NVI?" abre o Bible.com.
 - `#/treino/N`: foto (com enquadramento 4:5), tipo, minutos (stepper de 5 em 5, mínimo 30), legenda, postar.
@@ -70,6 +71,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - `visibilitychange`: só recarrega dados e redesenha em telas de leitura (hoje, mural, ranking, calendário), nunca em formulário.
 - Auto-atualização: `MY_V` lê o `?v=N` do próprio `app.js`; ao abrir e ao voltar pro app, busca o `index.html` sem cache e, se o número mudou, recarrega com `?v=N` (exceto no meio de cadastro, treino ou com enquadramento aberto).
 - Fotos: `pickPhoto()` = `decodeAny()` (createImageBitmap, depois `<img>`, depois heic2any) → `limitSize()` (máx 2000 px) → `cropImage()` (tela "Ajuste a foto": arrastar, zoom por controle e pinça) → JPEG. Se nada abrir a imagem, aceita o arquivo original pra não travar o cadastro.
+- `sharePreview(btn, {make, fileName, heading, alt, title, text})`: prévia genérica de imagem com Compartilhar e Salvar, usada pela montagem do dia e pela dica (`makeTipImage`). Botão da dica: clique delegado em `[data-share-tip]`.
 - Curtidas: clique delegado em `[data-like]` (comentários) e `[data-tlike]` (treinos), mesma função com a config `LK` (tabela, coluna, lista em `S.likes`/`S.tlikes`), atualização otimista.
 
 - Dicas da Nutri: lista fixa em `dicas.js` (`window.DICAS`, cada item com `dia`, `titulo`, `texto`). Uma dica aparece a partir do dia do desafio em `dia` (agendamento sem backend). A foto vem do cadastro: `nutri()` acha a participante cujo nome começa com "Jake". Pra lançar dica nova: acrescentar item com o próximo dia livre e subir o `?v=N`.
@@ -101,6 +103,7 @@ Observações de ambiente (aprendidas):
 - Campo de texto no fim da tela: o teclado do celular cobre o que cresce. Rolar com base em `window.visualViewport` (altura visível real) a cada `input` e no `resize` do viewport, e esconder o menu fixo durante o foco.
 - Link do app deve ser aberto no Safari/Chrome, não dentro do WhatsApp (galeria pode não abrir).
 - Dicas da Nutri ficam num arquivo do repo, não no Supabase (v=17): agendar por dia sem tabela nova nem SQL. A Jake não posta sozinha; ela manda no grupo e o Xande pede pro Claude reescrever curto e agendar. Se ela quiser postar direto, aí sim criar tabela `dicas` e uma tela de postagem só pra ela.
+- Balão da dica no Hoje deixou de ser um link inteiro (v=19): não dá pra pôr botão dentro de `<a>`. Agora é `<article>` com "Ver todas as dicas" e "Compartilhar" embaixo.
 - Texto das dicas: reescrito curto a partir do que a Jake mandou no grupo, sem acrescentar afirmação de saúde que ela não fez.
 
 ## 8. Identidade visual
@@ -131,6 +134,7 @@ Observações de ambiente (aprendidas):
 
 Formato: data · versão · o que mudou · por quê. Mais recente em cima.
 
+- 21/10/2026 · v=19 · Botão Compartilhar em cada dica da Nutri: gera imagem 1080x1350 com a foto da Jake e o texto, pronta pro WhatsApp. Prévia da montagem virou função genérica (`sharePreview`). Pedido do Xande.
 - 21/10/2026 · v=18 · Título da seção no Hoje encurtado pra "Dicas da Nutri"; o nome "Nutri Jake" fica só dentro do balão. Pedido do Xande pra não repetir o nome.
 - 21/10/2026 · v=17 · Dicas da Nutri Jake: card com a dica do dia no Hoje e nova aba Nutri no menu (mural com as dicas, mais nova em cima). 7 dicas agendadas em `dicas.js`, uma por dia do dia 3 ao 9. Pedido do Xande pra dar espaço à nutricionista do GC.
 - 20/10/2026 · v=16 · Curtir foto de treino (coração embaixo da foto no mural e na tela do treino, tabela `checkin_likes`); empate no ranking decidido por quem chegou na pontuação mais cedo.

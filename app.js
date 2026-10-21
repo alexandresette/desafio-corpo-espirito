@@ -466,11 +466,15 @@
   // --- dicas da nutri (dicas.js) ---
   const nutri = () => S.people.find((p) => /^jake/i.test(String(p.name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()));
   const dicasAte = (day) => (window.DICAS || []).filter((d) => d.dia <= day).sort((a, b) => b.dia - a.dia);
-  const dicaCard = (d, destaque) => `
+  const dicaCard = (d, destaque, verTodas) => `
       <article class="dica${destaque ? ' nova' : ''}">
         <div class="dica-top">${avatar(nutri(), destaque ? 40 : 32)}<div class="grow"><div class="dica-quem">Nutri Jake</div><div class="small">${destaque ? 'Dica de hoje' : `Dia ${d.dia} · ${shortDate(d.dia)}`}</div></div></div>
         <div class="dica-tit">${esc(d.titulo)}</div>
         <p class="dica-txt">${esc(d.texto)}</p>
+        <div class="dica-acoes">
+          ${verTodas ? '<a class="dica-mais" href="#/nutri">Ver todas as dicas</a>' : ''}
+          <button class="dica-share" type="button" data-share-tip="${d.dia}">${ICON.share}Compartilhar</button>
+        </div>
       </article>`;
   // --- hoje ---
   function taskCards(day, pid) {
@@ -517,7 +521,7 @@
             return `<span title="${esc(p.name)}" style="border-radius:50%;outline:2.5px solid ${f ? 'var(--gold)' : 'transparent'};outline-offset:2px;${f ? '' : 'opacity:.45'}">${avatar(p, 34)}</span>`;
           }).join('')}</div>
         </div>
-        ${(() => { const d = dicasAte(t)[0]; return d ? `<div class="section-title">Dicas da Nutri</div>${dicaCard(d, true).replace('<article', '<a href="#/nutri"').replace('</article>', '<span class="dica-mais">Ver todas as dicas</span></a>')}` : ''; })()}`;
+        ${(() => { const d = dicasAte(t)[0]; return d ? `<div class="section-title">Dicas da Nutri</div>${dicaCard(d, true, true)}` : ''; })()}`;
     }
     app.innerHTML = `
       <div class="stack" style="padding-top:22px">
@@ -834,19 +838,20 @@
     g.fillText('Desafio Corpo e Espírito · Lagoinha Valinhos', P, H - P);
     return canvasToBlob(c);
   }
-  async function openCollage(day, btn) {
+  // prévia de imagem com Compartilhar (2º toque, exige gesto recente) e Salvar
+  async function sharePreview(btn, { make, fileName, heading, alt, title, text }) {
     const label = btn.innerHTML; btn.disabled = true; btn.textContent = 'Montando…';
     try {
-      const blob = await makeCollage(day);
+      const blob = await make();
       const url = URL.createObjectURL(blob);
-      const file = new File([blob], `desafio-dia-${day}.jpg`, { type: 'image/jpeg' });
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
       const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
       const m = document.createElement('div'); m.className = 'cropper';
       m.innerHTML = `<div class="crop-box">
-        <div class="row" style="width:100%"><div class="crop-title grow">MONTAGEM DO DIA ${day}</div><button class="icon-btn mc-close" type="button" aria-label="Fechar" style="margin:0">${ICON.x}</button></div>
-        <img src="${url}" alt="Montagem dos treinos do dia ${day}" style="width:100%;border-radius:14px;max-height:60dvh;object-fit:contain;background:#fff">
+        <div class="row" style="width:100%"><div class="crop-title grow">${esc(heading)}</div><button class="icon-btn mc-close" type="button" aria-label="Fechar" style="margin:0">${ICON.x}</button></div>
+        <img src="${url}" alt="${esc(alt)}" style="width:100%;border-radius:14px;max-height:60dvh;object-fit:contain;background:#fff">
         ${canShare ? '<button class="btn gold mc-share" type="button">Compartilhar</button>' : ''}
-        <a class="btn ${canShare ? 'outline' : ''}" href="${url}" download="desafio-dia-${day}.jpg" style="text-decoration:none">Salvar imagem</a>
+        <a class="btn ${canShare ? 'outline' : ''}" href="${url}" download="${esc(fileName)}" style="text-decoration:none">Salvar imagem</a>
       </div>`;
       document.body.appendChild(m);
       const close = () => { m.remove(); URL.revokeObjectURL(url); };
@@ -854,12 +859,76 @@
       m.addEventListener('click', (e) => { if (e.target === m) close(); });
       const s2 = $('.mc-share', m);
       if (s2) s2.onclick = async () => {
-        try { await navigator.share({ files: [file], title: `Desafio Corpo e Espírito · Dia ${day}` }); }
-        catch (e) { if (e && e.name !== 'AbortError') toast('Não deu pra compartilhar. Use Salvar imagem.'); }
+        const data = { files: [file], title };
+        if (text) data.text = text;
+        try { await navigator.share(data); }
+        catch (e) {
+          if (e && e.name === 'AbortError') return;
+          try { await navigator.share({ files: [file], title }); } // alguns apps recusam texto junto
+          catch (e2) { if (e2 && e2.name !== 'AbortError') toast('Não deu pra compartilhar. Use Salvar imagem.'); }
+        }
       };
     } catch (e) { console.error(e); toast('Não deu pra montar agora. Tenta de novo.'); }
     finally { btn.disabled = false; btn.innerHTML = label; }
   }
+  const openCollage = (day, btn) => sharePreview(btn, {
+    make: () => makeCollage(day), fileName: `desafio-dia-${day}.jpg`, heading: `MONTAGEM DO DIA ${day}`,
+    alt: `Montagem dos treinos do dia ${day}`, title: `Desafio Corpo e Espírito · Dia ${day}`
+  });
+
+  // ---------- imagem da dica da nutri ----------
+  async function makeTipImage(d) {
+    try { await Promise.all(['700 96px "Barlow Condensed"', '700 30px Figtree', '400 44px Figtree', '600 34px Figtree'].map((f) => document.fonts.load(f))); } catch { /* fonte do sistema */ }
+    const W = 1080, H = 1350, P = 80;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#F6F1E6'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#C9963B'; g.fillRect(0, 0, W, 14);
+    // cabeçalho: foto + nome
+    const n = nutri(); let av = null;
+    if (n && n.photo_url) { try { av = await decodeImg(await fetch(n.photo_url).then((r) => { if (!r.ok) throw new Error(); return r.blob(); })); } catch { av = null; } }
+    const R = 66, cx = P + R, cy = 110 + R;
+    g.save(); g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.closePath(); g.clip();
+    g.fillStyle = '#EEE7D8'; g.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+    if (av) { const k = Math.max(2 * R / av.width, 2 * R / av.height); g.drawImage(av, cx - av.width * k / 2, cy - av.height * k / 2, av.width * k, av.height * k); if (av.close) av.close(); }
+    g.restore();
+    g.strokeStyle = '#C9963B'; g.lineWidth = 6; g.beginPath(); g.arc(cx, cy, R + 7, 0, Math.PI * 2); g.stroke();
+    const tx = cx + R + 34;
+    g.fillStyle = '#8A5A2B'; g.font = '700 28px Figtree, sans-serif';
+    g.fillText('DICA DA NUTRI', tx, cy - 14);
+    g.fillStyle = '#232B1C'; g.font = '700 46px Figtree, sans-serif';
+    g.fillText('Nutri Jake', tx, cy + 40);
+    // título e texto, centralizados na área do meio
+    g.font = '700 96px "Barlow Condensed", sans-serif';
+    const tl = wrap(g, String(d.titulo).toUpperCase(), W - 2 * P, 4);
+    g.font = '400 44px Figtree, sans-serif';
+    const bl = wrap(g, d.texto, W - 2 * P, 10);
+    const blockH = tl.length * 98 + 44 + bl.length * 64;
+    const top = 330, bottom = H - 190;
+    let y = top + Math.max(0, (bottom - top - blockH) / 2);
+    g.fillStyle = '#2F3A26'; g.font = '700 96px "Barlow Condensed", sans-serif';
+    tl.forEach((ln) => { y += 88; g.fillText(ln, P, y); y += 10; });
+    y += 44 - 60 + 40;
+    g.fillStyle = '#232B1C'; g.font = '400 44px Figtree, sans-serif';
+    bl.forEach((ln) => { y += 64; g.fillText(ln, P, y); });
+    // rodapé
+    g.fillStyle = '#2F3A26'; g.fillRect(0, H - 130, W, 130);
+    g.fillStyle = '#E2C287'; g.font = '700 30px Figtree, sans-serif';
+    g.fillText('DESAFIO CORPO E ESPÍRITO', P, H - 74);
+    g.fillStyle = '#F6F1E6'; g.font = '400 26px Figtree, sans-serif';
+    g.fillText('GC Samambaia · Lagoinha Valinhos', P, H - 38);
+    return canvasToBlob(c);
+  }
+  const shareTip = (d, btn) => sharePreview(btn, {
+    make: () => makeTipImage(d), fileName: `dica-nutri-dia-${d.dia}.jpg`, heading: 'DICA DA NUTRI',
+    alt: `Dica da Nutri: ${d.titulo}`, title: `Dica da Nutri · ${d.titulo}`,
+    text: `Dica da Nutri Jake: ${d.titulo}. Desafio Corpo e Espírito, GC Samambaia.`
+  });
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-share-tip]'); if (!b) return;
+    const d = (window.DICAS || []).find((x) => String(x.dia) === b.dataset.shareTip);
+    if (d) shareTip(d, b);
+  });
 
   // --- ranking ---
   route('ranking', () => {
