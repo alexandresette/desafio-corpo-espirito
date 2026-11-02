@@ -2,7 +2,7 @@
 
 Arquivo vivo. Toda conversa nova começa lendo este arquivo e termina atualizando a seção "Diário de mudanças" e o que mais tiver mudado. Fonte da verdade: este arquivo dentro do repositório `alexandresette/desafio-corpo-espirito`.
 
-Última atualização: 21/10/2026 (v=21)
+Última atualização: 02/11/2026 (v=22)
 
 ## 1. O que é
 
@@ -55,7 +55,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - Compartilhar dica (botão em cada balão, no Hoje e na Nutri): gera imagem 1080x1350 (foto da Jake, título, texto, rodapé do desafio), mostra prévia e compartilha no segundo toque, com legenda junto quando o app aceita.
 - Meu perfil (modal): ajustar enquadramento da foto atual, escolher outra foto, mudar nome, salvar, sair da conta (pede segundo toque).
 - `#/leitura/N`: texto do capítulo dentro do app (Bíblia Livre), tocar em versículos seleciona e aparece barra "Copiar" com referência (ex.: "Provérbios 1:5-7,9 (Bíblia Livre)"), botão "Li o capítulo", conversa do dia com curtidas. Link "Prefere a NVI?" abre o Bible.com.
-- `#/treino/N`: foto (com enquadramento 4:5), tipo, minutos (stepper de 5 em 5, mínimo 30), legenda, postar.
+- `#/treino/N`: foto (com enquadramento 4:5), tipo, minutos (stepper de 5 em 5, mínimo 30), legenda, postar. Depois de postado, mostra o treino e, enquanto o dia ainda pode ser marcado (hoje ou ontem), o botão "Apagar e postar outra foto" (segundo toque confirma). Apagar tira o ponto até repostar.
 - `#/mural/N`: faixa com o dia e setas (abre no dia de hoje, setas pra dias anteriores), botão "Compartilhar montagem do dia", comentário mais curtido em destaque, treinos do dia, comentários do dia com coração.
 - Montagem do dia: imagem 1080x1350 gerada no navegador (canvas) com até 16 fotos de treino com nome + comentário mais curtido. Prévia com "Compartilhar" (Web Share API) e "Salvar imagem".
 - `#/ranking`: pódio dos 3 primeiros (na base, colocação grande em cima e pontos menores embaixo; acima, leituras e treinos); lista do 4º em diante; rodapé explica o desempate.
@@ -72,6 +72,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 - Auto-atualização: `MY_V` lê o `?v=N` do próprio `app.js`; ao abrir e ao voltar pro app, busca o `index.html` sem cache e, se o número mudou, recarrega com `?v=N` (exceto no meio de cadastro, treino ou com enquadramento aberto).
 - Fotos: `pickPhoto()` = `decodeAny()` (createImageBitmap, depois `<img>`, depois heic2any) → `limitSize()` (máx 2000 px) → `cropImage()` (tela "Ajuste a foto": arrastar, zoom por controle e pinça) → JPEG. Se nada abrir a imagem, aceita o arquivo original pra não travar o cadastro.
 - `sharePreview(btn, {make, fileName, heading, alt, title, text})`: prévia genérica de imagem com Compartilhar e Salvar, usada pela montagem do dia e pela dica (`makeTipImage`). Botão da dica: clique delegado em `[data-share-tip]`.
+- `confirmTap(btn, textoArmado, run)`: padrão de ação perigosa. 1º toque arma (botão fica vermelho, classe `armed`), 2º toque em até 4 s executa.
 - Curtidas: clique delegado em `[data-like]` (comentários) e `[data-tlike]` (treinos), mesma função com a config `LK` (tabela, coluna, lista em `S.likes`/`S.tlikes`), atualização otimista.
 
 - Dicas da Nutri: lista fixa em `dicas.js` (`window.DICAS`, cada item com `dia`, `titulo`, `texto`). Uma dica aparece a partir do dia do desafio em `dia` (agendamento sem backend). A foto vem do cadastro: `nutri()` acha a participante cujo nome começa com "Jake". Pra lançar dica nova: acrescentar item com o próximo dia livre e subir o `?v=N`.
@@ -105,6 +106,8 @@ Observações de ambiente (aprendidas):
 - Dicas da Nutri ficam num arquivo do repo, não no Supabase (v=17): agendar por dia sem tabela nova nem SQL. A Jake não posta sozinha; ela manda no grupo e o Xande pede pro Claude reescrever curto e agendar. Se ela quiser postar direto, aí sim criar tabela `dicas` e uma tela de postagem só pra ela.
 - Balão da dica no Hoje deixou de ser um link inteiro (v=19): não dá pra pôr botão dentro de `<a>`. Agora é `<article>` com "Ver todas as dicas" e "Compartilhar" embaixo.
 - Ao mudar uma regra, procurar o texto da tela que explica a regra: o rodapé do ranking ficou falando do desempate antigo de v=16 até v=21.
+- Apagar treino (v=22): só dentro de `canMark`, senão a pessoa perderia o ponto sem conseguir repostar. O delete filtra por `id` e `participant_id`. O arquivo da foto antiga fica no bucket (não há política de delete no storage pro `anon`); aceitável no plano grátis, limpar no fim se precisar.
+- Testar ação que grava sem mexer no banco: no Playwright, interceptar todo pedido não-GET pro `supabase.co`, responder 204 e conferir método e filtros do pedido.
 - Texto das dicas: reescrito curto a partir do que a Jake mandou no grupo, sem acrescentar afirmação de saúde que ela não fez.
 
 ## 8. Identidade visual
@@ -135,6 +138,7 @@ Observações de ambiente (aprendidas):
 
 Formato: data · versão · o que mudou · por quê. Mais recente em cima.
 
+- 02/11/2026 · v=22 · Apagar a própria foto de treino do dia pra trocar (tela do treino, segundo toque confirma, só hoje e ontem). Pedido do Xande.
 - 21/10/2026 · v=21 · Pódio do ranking: colocação (1º, 2º, 3º) grande em cima e pontuação menor embaixo, pedido do Xande. Rodapé corrigido pro desempate atual (quem chegou primeiro na pontuação).
 - 21/10/2026 · v=20 · Título "DESAFIO CORPO E ESPÍRITO" no topo do Hoje, acima da data. Pedido do Xande: faltava o nome do desafio na tela principal.
 - 21/10/2026 · v=19 · Botão Compartilhar em cada dica da Nutri: gera imagem 1080x1350 com a foto da Jake e o texto, pronta pro WhatsApp. Prévia da montagem virou função genérica (`sharePreview`). Pedido do Xande.

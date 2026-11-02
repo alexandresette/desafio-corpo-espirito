@@ -46,6 +46,12 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const app = $('#app');
   const toast = (msg) => { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600); };
+  // ação perigosa: 1º toque arma, 2º toque (em até 4 s) executa. Nada de confirm().
+  const confirmTap = (btn, armedText, run) => () => {
+    if (btn.dataset.armed) { clearTimeout(btn._t); delete btn.dataset.armed; btn.classList.remove('armed'); return run(); }
+    btn.dataset.armed = '1'; btn._label = btn.innerHTML; btn.textContent = armedText; btn.classList.add('armed');
+    btn._t = setTimeout(() => { delete btn.dataset.armed; btn.classList.remove('armed'); btn.innerHTML = btn._label; }, 4000);
+  };
   const sha256 = async (txt) => { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)); return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join(''); };
   const pinHash = (id, pin) => sha256(`desafio-samambaia:${id}:${pin}`);
   const onlyDigits = (el) => el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 4); });
@@ -645,7 +651,17 @@
       app.innerHTML = `
         <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a><h1>TREINO DO DIA ${day}</h1></div>
         <div class="post">${done.photo_url ? `<img class="ph" src="${esc(done.photo_url)}" alt="Foto do treino">` : ''}
-          <div class="acts">${treinoLike(done.id)}<div class="grow"><b>${esc(done.activity)} · ${done.minutes} min</b>${done.caption ? `<br>${esc(done.caption)}` : ''}</div></div></div>`;
+          <div class="acts">${treinoLike(done.id)}<div class="grow"><b>${esc(done.activity)} · ${done.minutes} min</b>${done.caption ? `<br>${esc(done.caption)}` : ''}</div></div></div>
+        ${canMark(day) ? `<div class="stack" style="gap:6px;padding-top:14px">
+          <button class="btn outline" id="delT" type="button">Apagar e postar outra foto</button>
+          <div class="small center">O ponto sai até você postar de novo. Dá pra trocar até o fim de ${day === todayIdx() ? 'amanhã' : 'hoje'}.</div></div>` : ''}`;
+      const del = $('#delT');
+      if (del) del.onclick = confirmTap(del, 'Toque de novo pra apagar', async () => {
+        del.disabled = true; del.textContent = 'Apagando…';
+        const { error } = await db.from('checkins').delete().eq('id', done.id).eq('participant_id', m.id);
+        if (error) { console.error(error); toast('Não deu pra apagar. Tenta de novo.'); del.disabled = false; del.textContent = 'Apagar e postar outra foto'; return; }
+        await load(); toast('Foto apagada. Agora é só postar a nova.'); render();
+      });
       return;
     }
     if (!canMark(day)) {
