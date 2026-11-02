@@ -247,3 +247,10 @@ body.typing #tabs { display: none; }
 .bubble-foot { align-items: center; }
 .comment.editing .bubble { flex: 1; min-width: 0; }
 .bubble-foot[hidden] { display: none; }
+/* comentários nas fotos de treino */
+.post .acts .like + .like { margin-left: -6px; }
+.post-cmts { display: flex; flex-direction: column; gap: 4px; padding: 0 14px 14px; text-decoration: none; color: var(--ink); font-size: 14px; line-height: 1.35; }
+.post-cmts .small { color: var(--muted-2); }
+.pc-line { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+.pc-line b { font-weight: 700; }
+a.like { text-decoration: none; }

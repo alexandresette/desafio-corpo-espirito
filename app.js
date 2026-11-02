@@ -77,7 +77,8 @@
     heart: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
     next: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
     share: '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v8h14v-8"/></svg>',
-    x: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'
+    x: '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    chat: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>'
   };
 
   // reduz a foto antes de subir (máx 1080px, jpeg)
@@ -220,16 +221,17 @@
   const person = (id) => S.people.find((p) => p.id === id);
 
   async function load() {
-    const [p, c, m, l, tl] = await Promise.all([
+    const [p, c, m, l, tl, pc] = await Promise.all([
       db.from('participants').select('id,name,photo_url,pin_hash,created_at').order('created_at'),
       db.from('checkins').select('*').order('created_at', { ascending: false }),
       db.from('comments').select('*').order('created_at'),
       db.from('likes').select('comment_id,participant_id'),
-      db.from('checkin_likes').select('checkin_id,participant_id')
+      db.from('checkin_likes').select('checkin_id,participant_id'),
+      db.from('checkin_comments').select('*').order('created_at')
     ]);
     const err = p.error || c.error || m.error;
     if (err) throw err;
-    S.people = p.data; S.checkins = c.data; S.comments = m.data; S.likes = l.error ? [] : l.data; S.tlikes = tl.error ? [] : tl.data; S.loaded = true;
+    S.people = p.data; S.checkins = c.data; S.comments = m.data; S.likes = l.error ? [] : l.data; S.tlikes = tl.error ? [] : tl.data; S.pcomments = pc.error ? [] : pc.data; S.pcOk = !pc.error; S.loaded = true;
   }
 
   // ---------- curtidas (comentários: data-like, treinos: data-tlike) ----------
@@ -241,9 +243,21 @@
   const likesOf = (cid) => likesOfK('c', cid);
   const likedByMeK = (k, id) => likesOfK(k, id).some((x) => x.participant_id === meId());
   // Editar/Apagar só aparecem no comentário da própria pessoa
-  const ownActs = (c) => c.participant_id === meId()
-    ? `<span class="cm-acts"><button class="cm-act" type="button" data-cedit="${c.id}">Editar</button><button class="cm-act" type="button" data-cdel="${c.id}">Apagar</button></span>`
+  const ownActs = (c, kind = 'c') => c.participant_id === meId()
+    ? `<span class="cm-acts"><button class="cm-act" type="button" data-ck="${kind}" data-cedit="${c.id}">Editar</button><button class="cm-act" type="button" data-ck="${kind}" data-cdel="${c.id}">Apagar</button></span>`
     : '';
+  // comentários: c = conversa da leitura (comments), p = foto de treino (checkin_comments)
+  const CK = {
+    c: { table: 'comments', get: () => S.comments, set: (v) => { S.comments = v; } },
+    p: { table: 'checkin_comments', get: () => S.pcomments || [], set: (v) => { S.pcomments = v; } }
+  };
+  const pcOf = (cid) => (S.pcomments || []).filter((c) => c.checkin_id === cid);
+  const chatBtn = (cid) => S.pcOk ? `<a class="like" href="#/foto/${cid}" aria-label="Comentar a foto">${ICON.chat}<span>${pcOf(cid).length || ''}</span></a>` : '';
+  // prévia dos 2 últimos comentários embaixo da foto
+  const pcPreview = (cid) => {
+    const list = pcOf(cid); if (!S.pcOk || !list.length) return '';
+    return `<a class="post-cmts" href="#/foto/${cid}">${list.length > 2 ? `<span class="small">Ver os ${list.length} comentários</span>` : ''}${list.slice(-2).map((c) => `<span class="pc-line"><b>${esc(person(c.participant_id)?.name || '?')}</b> ${esc(c.body)}</span>`).join('')}</a>`;
+  };
   const likeBtnK = (k, id) => {
     const n = likesOfK(k, id).length, on = likedByMeK(k, id);
     return `<button class="like${on ? ' on' : ''}" type="button" data-${LK[k].attr}="${id}" aria-pressed="${on}" aria-label="${on ? 'Descurtir' : 'Curtir'} ${LK[k].what}">${ICON.heart}<span>${n || ''}</span></button>`;
@@ -280,18 +294,19 @@
     if (!del && !ed) return;
     e.preventDefault(); e.stopPropagation();
     const mid = meId(); if (!mid) return;
+    const K = CK[(del || ed).dataset.ck === 'p' ? 'p' : 'c'];
     if (del) {
       const id = del.dataset.cdel;
       return confirmTap(del, 'Apagar mesmo?', async () => {
         del.disabled = true;
-        const { error } = await db.from('comments').delete().eq('id', id).eq('participant_id', mid);
+        const { error } = await db.from(K.table).delete().eq('id', id).eq('participant_id', mid);
         if (error) { console.error(error); toast('Não deu pra apagar. Tenta de novo.'); del.disabled = false; return; }
-        S.comments = S.comments.filter((c) => c.id !== id);
+        K.set(K.get().filter((c) => c.id !== id));
         S.likes = (S.likes || []).filter((l) => l.comment_id !== id);
         toast('Comentário apagado.'); rerenderKeep();
       })();
     }
-    const id = ed.dataset.cedit, c = S.comments.find((x) => x.id === id);
+    const id = ed.dataset.cedit, c = K.get().find((x) => x.id === id);
     const box = ed.closest('.comment, .comment-card'), body = box && box.querySelector(`[data-cbody="${id}"]`);
     if (!c || !body || box.querySelector('.cm-edit')) return;
     const foot = box.querySelector('.bubble-foot'); if (foot) foot.hidden = true;
@@ -313,7 +328,7 @@
       if (!txt) { toast('O comentário não pode ficar vazio. Pra tirar, use Apagar.'); return; }
       if (txt === c.body) { rerenderKeep(); return; }
       save.disabled = true; save.textContent = 'Salvando…';
-      const { error } = await db.from('comments').update({ body: txt }).eq('id', id).eq('participant_id', mid);
+      const { error } = await db.from(K.table).update({ body: txt }).eq('id', id).eq('participant_id', mid);
       if (error) { console.error(error); toast('Não deu pra salvar. Tenta de novo.'); save.disabled = false; save.textContent = 'Salvar'; return; }
       c.body = txt; toast('Comentário atualizado.'); rerenderKeep();
     };
@@ -672,29 +687,33 @@
       await load(); toast('+1 ponto. Agora conta pra gente o que te marcou.'); render();
       setTimeout(() => $('#cm')?.focus(), 50);
     };
-    const cm = $('#cm');
-    if (cm) {
-      // Mantém o campo visível acima do teclado enquanto o texto cresce
-      const keepVisible = () => requestAnimationFrame(() => {
-        const box = cm.closest('.composer') || cm;
-        const vv = window.visualViewport;
-        const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
-        const r = box.getBoundingClientRect();
-        if (r.bottom > bottom - 12) window.scrollBy(0, r.bottom - bottom + 16);
-      });
-      const grow = () => { cm.style.height = 'auto'; cm.style.height = Math.min(cm.scrollHeight, 160) + 'px'; keepVisible(); };
-      cm.addEventListener('input', grow);
-      cm.addEventListener('focus', () => { document.body.classList.add('typing'); window.visualViewport?.addEventListener('resize', keepVisible); setTimeout(keepVisible, 300); });
-      cm.addEventListener('blur', () => { document.body.classList.remove('typing'); window.visualViewport?.removeEventListener('resize', keepVisible); });
-      $('#send').onclick = async () => {
-        const body = cm.value.trim(); if (!body) return;
-        $('#send').disabled = true;
-        const { error } = await db.from('comments').insert({ participant_id: m.id, day, body });
-        if (error) { toast('Não deu pra enviar.'); $('#send').disabled = false; return; }
-        await load(); render();
-      };
-    }
+    bindComposer(async (body) => {
+      const { error } = await db.from('comments').insert({ participant_id: m.id, day, body });
+      if (error) throw error;
+    });
   });
+
+  // campo de comentário (#cm + #send): cresce com o texto, fica acima do teclado, envia e redesenha
+  function bindComposer(send) {
+    const cm = $('#cm'); if (!cm) return;
+    const keepVisible = () => requestAnimationFrame(() => {
+      const box = cm.closest('.composer') || cm;
+      const vv = window.visualViewport;
+      const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+      const r = box.getBoundingClientRect();
+      if (r.bottom > bottom - 12) window.scrollBy(0, r.bottom - bottom + 16);
+    });
+    const grow = () => { cm.style.height = 'auto'; cm.style.height = Math.min(cm.scrollHeight, 160) + 'px'; keepVisible(); };
+    cm.addEventListener('input', grow);
+    cm.addEventListener('focus', () => { document.body.classList.add('typing'); window.visualViewport?.addEventListener('resize', keepVisible); setTimeout(keepVisible, 300); });
+    cm.addEventListener('blur', () => { document.body.classList.remove('typing'); window.visualViewport?.removeEventListener('resize', keepVisible); });
+    $('#send').onclick = async () => {
+      const body = cm.value.trim(); if (!body) return;
+      $('#send').disabled = true;
+      try { await send(body); } catch (e) { console.error(e); toast('Não deu pra enviar.'); $('#send').disabled = false; return; }
+      cm.value = ''; await load(); rerenderKeep();
+    };
+  }
 
   // --- treino ---
   route('treino', (day) => {
@@ -706,7 +725,8 @@
       app.innerHTML = `
         <div class="top"><a class="icon-btn" href="#/hoje" aria-label="Voltar">${ICON.back}</a><h1>TREINO DO DIA ${day}</h1></div>
         <div class="post">${done.photo_url ? `<img class="ph" src="${esc(done.photo_url)}" alt="Foto do treino">` : ''}
-          <div class="acts">${treinoLike(done.id)}<div class="grow"><b>${esc(done.activity)} · ${done.minutes} min</b>${done.caption ? `<br>${esc(done.caption)}` : ''}</div></div></div>
+          <div class="acts">${treinoLike(done.id)}${chatBtn(done.id)}<div class="grow"><b>${esc(done.activity)} · ${done.minutes} min</b>${done.caption ? `<br>${esc(done.caption)}` : ''}</div></div>
+          ${pcPreview(done.id)}</div>
         ${canMark(day) ? `<div class="stack" style="gap:6px;padding-top:14px">
           <button class="btn outline" id="delT" type="button">Apagar e postar outra foto</button>
           <div class="small center">O ponto sai até você postar de novo. Dá pra trocar até o fim de ${day === todayIdx() ? 'amanhã' : 'hoje'}.</div></div>` : ''}`;
@@ -773,6 +793,41 @@
     };
   });
 
+  // --- foto de treino com comentários ---
+  route('foto', (id) => {
+    shell(true, 'mural');
+    const it = S.checkins.find((c) => c.id === id && c.kind === 'treino');
+    if (!it || !S.pcOk) {
+      app.innerHTML = `<div class="top"><a class="icon-btn" href="#/mural" aria-label="Voltar">${ICON.back}</a><h1>FOTO</h1></div><p class="sub">Esse treino não está mais aqui.</p>`;
+      return;
+    }
+    const p = person(it.participant_id), list = pcOf(it.id), mine = it.participant_id === meId();
+    app.innerHTML = `
+      <div class="top"><a class="icon-btn" href="#/mural/${it.day}" aria-label="Voltar">${ICON.back}</a><h1>${mine ? 'MEU TREINO' : `TREINO DE ${esc(String(p?.name || '').toUpperCase())}`}</h1></div>
+      <div class="stack" style="padding-top:4px">
+        <div class="post">
+          <div class="head">${avatar(p, 36)}<div class="grow"><b>${esc(p?.name)}</b><div class="small">Dia ${it.day} · ${esc(it.activity)} · ${it.minutes} min</div></div><span class="small">${timeAgo(it.created_at)}</span></div>
+          ${it.photo_url ? `<img class="ph" src="${esc(it.photo_url)}" alt="Treino de ${esc(p?.name)}">` : ''}
+          <div class="acts">${treinoLike(it.id)}${it.caption ? `<div class="grow">${esc(it.caption)}</div>` : ''}</div>
+        </div>
+        <div class="row" style="margin-top:6px"><div class="grow section-title" style="margin:0">Comentários</div><div class="small">${list.length} ${list.length === 1 ? 'comentário' : 'comentários'}</div></div>
+        <div class="stack" style="gap:10px">${list.length ? list.map((c) => {
+          const a = person(c.participant_id);
+          return `<div class="comment">${avatar(a, 32)}<div class="bubble"><b>${esc(a?.name || '?')}</b> <span class="small">· ${timeAgo(c.created_at)}</span><br><span data-cbody="${c.id}">${esc(c.body)}</span><div class="bubble-foot">${ownActs(c, 'p')}</div></div></div>`;
+        }).join('') : `<div class="small">${mine ? 'Ninguém comentou ainda.' : `Seja o primeiro a comentar o treino de ${esc(p?.name)}.`}</div>`}</div>
+        <div class="composer">
+          <label class="sr" for="cm">Seu comentário</label>
+          <textarea class="input grow" id="cm" rows="1" maxlength="500" placeholder="${mine ? 'Responder…' : 'Manda uma força…'}"></textarea>
+          <button class="send" id="send" aria-label="Enviar comentário">${ICON.send}</button>
+        </div>
+      </div>`;
+    $$('img.ph').forEach((img) => img.onclick = () => zoom(img.src));
+    bindComposer(async (body) => {
+      const { error } = await db.from('checkin_comments').insert({ checkin_id: it.id, participant_id: meId(), body });
+      if (error) throw error;
+    });
+  });
+
   // --- mural ---
   route('mural', (arg) => {
     shell(true, 'mural');
@@ -813,7 +868,8 @@
           return `<div class="post">
               <div class="head">${avatar(p, 36)}<div class="grow"><b>${esc(p?.name)}</b><div class="small">${esc(it.activity)} · ${it.minutes} min</div></div><span class="small">${timeAgo(it.created_at)}</span></div>
               ${it.photo_url ? `<img class="ph" src="${esc(it.photo_url)}" alt="Treino de ${esc(p?.name)}" loading="lazy">` : ''}
-              <div class="acts">${treinoLike(it.id)}${it.caption ? `<div class="grow">${esc(it.caption)}</div>` : ''}</div>
+              <div class="acts">${treinoLike(it.id)}${chatBtn(it.id)}${it.caption ? `<div class="grow">${esc(it.caption)}</div>` : ''}</div>
+              ${pcPreview(it.id)}
             </div>`;
         }).join('') : '<div class="card sub">Ninguém postou treino nesse dia ainda.</div>'}
         <div class="section-title">Comentários da leitura <span class="small">(${coments.length})</span></div>
@@ -1218,7 +1274,7 @@
       if (v && v !== MY_V) {
         const name = location.hash.replace(/^#\/?/, '').split('/')[0] || 'hoje';
         const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
-        const formOpen = document.querySelector('.cropper') || DRAFT.signup || DRAFT.treino || ['cadastro', 'treino', 'trocar-pin'].includes(name) || (name === 'leitura' && typing);
+        const formOpen = document.querySelector('.cropper') || DRAFT.signup || DRAFT.treino || ['cadastro', 'treino', 'trocar-pin'].includes(name) || (['leitura', 'foto'].includes(name) && typing);
         if (force || !formOpen) { location.replace(location.pathname + '?v=' + v + location.hash); return true; }
       }
     } catch { /* sem rede */ }

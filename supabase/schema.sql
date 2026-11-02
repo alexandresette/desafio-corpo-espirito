@@ -70,3 +70,15 @@ create table if not exists checkin_likes (
 alter table checkin_likes enable row level security;
 create policy "aberto" on checkin_likes for all to anon using (true) with check (true);
 grant select, insert, delete on checkin_likes to anon;
+
+-- v=24: comentários nas fotos de treino
+create table if not exists checkin_comments (
+  id uuid primary key default gen_random_uuid(),
+  checkin_id uuid not null references checkins(id) on delete cascade,
+  participant_id uuid not null references participants(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 500),
+  created_at timestamptz not null default now()
+);
+alter table checkin_comments enable row level security;
+create policy "aberto" on checkin_comments for all to anon using (true) with check (true);
+grant select, insert, update, delete on checkin_comments to anon;
