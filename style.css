@@ -236,3 +236,14 @@ body.typing #tabs { display: none; }
 #tabs a { font-size: 11px; }
 .hoje-marca { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: .04em; color: var(--clay); line-height: 1; }
 .btn.armed { background: var(--err); border-color: var(--err); color: #fff; }
+/* editar/apagar o próprio comentário */
+.cm-acts { display: inline-flex; gap: 2px; margin-right: auto; }
+.cm-act { border: 0; background: transparent; color: var(--muted-2); font: 600 13px Figtree, sans-serif; min-height: 36px; padding: 0 8px; border-radius: 10px; cursor: pointer; }
+.cm-act.armed { background: var(--err); color: #fff; }
+.cm-edit { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; white-space: normal; }
+.cm-edit textarea { height: auto; min-height: 88px; padding: 10px 12px; font: 15px/1.4 Figtree, sans-serif; resize: vertical; }
+.cm-edit-acts { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.cm-edit-acts .btn { width: auto; height: 40px; padding: 0 18px; }
+.bubble-foot { align-items: center; }
+.comment.editing .bubble { flex: 1; min-width: 0; }
+.bubble-foot[hidden] { display: none; }

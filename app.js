@@ -240,6 +240,10 @@
   const likesOfK = (k, id) => LK[k].get().filter((x) => x[LK[k].key] === id);
   const likesOf = (cid) => likesOfK('c', cid);
   const likedByMeK = (k, id) => likesOfK(k, id).some((x) => x.participant_id === meId());
+  // Editar/Apagar só aparecem no comentário da própria pessoa
+  const ownActs = (c) => c.participant_id === meId()
+    ? `<span class="cm-acts"><button class="cm-act" type="button" data-cedit="${c.id}">Editar</button><button class="cm-act" type="button" data-cdel="${c.id}">Apagar</button></span>`
+    : '';
   const likeBtnK = (k, id) => {
     const n = likesOfK(k, id).length, on = likedByMeK(k, id);
     return `<button class="like${on ? ' on' : ''}" type="button" data-${LK[k].attr}="${id}" aria-pressed="${on}" aria-label="${on ? 'Descurtir' : 'Curtir'} ${LK[k].what}">${ICON.heart}<span>${n || ''}</span></button>`;
@@ -262,6 +266,57 @@
     on ? drop() : add(); paint();
     const { error } = on ? await db.from(L.table).delete().match(row) : await db.from(L.table).insert(row);
     if (error && error.code !== '23505') { on ? add() : drop(); paint(); toast('Não deu pra curtir agora.'); }
+  });
+
+  // redesenha a tela sem perder a rolagem nem o texto que a pessoa estava digitando no campo de comentário
+  const rerenderKeep = () => {
+    const y = window.scrollY, draft = $('#cm') ? $('#cm').value : '';
+    render();
+    if (draft && $('#cm')) $('#cm').value = draft;
+    requestAnimationFrame(() => window.scrollTo(0, y));
+  };
+  document.addEventListener('click', async (e) => {
+    const del = e.target.closest('[data-cdel]'), ed = e.target.closest('[data-cedit]');
+    if (!del && !ed) return;
+    e.preventDefault(); e.stopPropagation();
+    const mid = meId(); if (!mid) return;
+    if (del) {
+      const id = del.dataset.cdel;
+      return confirmTap(del, 'Apagar mesmo?', async () => {
+        del.disabled = true;
+        const { error } = await db.from('comments').delete().eq('id', id).eq('participant_id', mid);
+        if (error) { console.error(error); toast('Não deu pra apagar. Tenta de novo.'); del.disabled = false; return; }
+        S.comments = S.comments.filter((c) => c.id !== id);
+        S.likes = (S.likes || []).filter((l) => l.comment_id !== id);
+        toast('Comentário apagado.'); rerenderKeep();
+      })();
+    }
+    const id = ed.dataset.cedit, c = S.comments.find((x) => x.id === id);
+    const box = ed.closest('.comment, .comment-card'), body = box && box.querySelector(`[data-cbody="${id}"]`);
+    if (!c || !body || box.querySelector('.cm-edit')) return;
+    const foot = box.querySelector('.bubble-foot'); if (foot) foot.hidden = true;
+    box.classList.add('editing');
+    const f = document.createElement('div'); f.className = 'cm-edit';
+    f.innerHTML = `<label class="sr" for="ce-${id}">Editar comentário</label>
+      <textarea class="input" id="ce-${id}" maxlength="1000" rows="3"></textarea>
+      <div class="cm-edit-acts"><button class="cm-act" type="button" data-x>Cancelar</button><button class="btn" type="button" data-s>Salvar</button></div>`;
+    body.replaceWith(f);
+    const ta = f.querySelector('textarea'); ta.value = c.body;
+    const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 4, window.innerHeight * 0.5) + 'px'; };
+    fit(); ta.addEventListener('input', fit);
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+    f.querySelector('[data-x]').onclick = (ev) => { ev.preventDefault(); rerenderKeep(); };
+    const save = f.querySelector('[data-s]');
+    save.onclick = async (ev) => {
+      ev.preventDefault();
+      const txt = ta.value.trim();
+      if (!txt) { toast('O comentário não pode ficar vazio. Pra tirar, use Apagar.'); return; }
+      if (txt === c.body) { rerenderKeep(); return; }
+      save.disabled = true; save.textContent = 'Salvando…';
+      const { error } = await db.from('comments').update({ body: txt }).eq('id', id).eq('participant_id', mid);
+      if (error) { console.error(error); toast('Não deu pra salvar. Tenta de novo.'); save.disabled = false; save.textContent = 'Salvar'; return; }
+      c.body = txt; toast('Comentário atualizado.'); rerenderKeep();
+    };
   });
 
   async function uploadPhoto(blob, folder) {
@@ -588,7 +643,7 @@
         <div class="row" style="margin-top:6px"><div class="grow section-title" style="margin:0">Conversa do dia</div><div class="small">${thread.length} ${thread.length === 1 ? 'comentário' : 'comentários'}</div></div>
         <div class="stack" style="gap:10px">${thread.length ? thread.map((c) => {
           const p = person(c.participant_id);
-          return `<div class="comment">${avatar(p, 32)}<div class="bubble"><b>${esc(p?.name || '?')}</b> <span class="small">· ${timeAgo(c.created_at)}</span><br>${esc(c.body)}<div class="bubble-foot">${likeBtn(c.id)}</div></div></div>`;
+          return `<div class="comment">${avatar(p, 32)}<div class="bubble"><b>${esc(p?.name || '?')}</b> <span class="small">· ${timeAgo(c.created_at)}</span><br><span data-cbody="${c.id}">${esc(c.body)}</span><div class="bubble-foot">${ownActs(c)}${likeBtn(c.id)}</div></div></div>`;
         }).join('') : '<div class="small">Ninguém comentou ainda. Que tal começar?</div>'}</div>
         ${day <= Math.max(todayIdx(), 0) || open ? `
         <div class="composer">
@@ -738,8 +793,8 @@
         ${destaque ? '<div class="kicker" style="margin-bottom:8px">COMENTÁRIO MAIS CURTIDO</div>' : ''}
         <div style="display:flex;gap:10px">${avatar(p, 36)}<div class="grow">
           <div class="row"><b class="grow">${esc(p?.name)}</b><span class="small">${timeAgo(c.created_at)}</span></div>
-          <a href="#/leitura/${c.day}" class="com-body">${esc(c.body)}</a>
-          <div class="bubble-foot">${likeBtn(c.id)}</div>
+          <a href="#/leitura/${c.day}" class="com-body" data-cbody="${c.id}">${esc(c.body)}</a>
+          <div class="bubble-foot">${ownActs(c)}${likeBtn(c.id)}</div>
         </div></div></div>`;
     };
     app.innerHTML = `
