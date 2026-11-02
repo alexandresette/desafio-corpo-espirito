@@ -93,7 +93,7 @@ No fim, ganha quem tiver mais pontos. O dono é o Xande (Alexandre Sette), líde
 Observações de ambiente (aprendidas):
 - A sessão em nuvem do Claude não consegue dar push nesse repo (app do GitHub não instalado). O que funcionou: rodar git/gh pelo shell do Mac do Xande (cópia em `/tmp/desafio-corpo-espirito`, que pode sumir; se não existir, clonar de novo).
 - Arquivos grandes (imagens) não passam bem colados em comando; gerar no próprio Mac (ex.: ícones via Chrome headless + `sips`).
-- Mudanças no banco: SQL Editor do Supabase no Chrome do Xande. Funciona setar o editor com `window.monaco.editor.getModels()[0].setValue(sql)` e clicar em Run. Registrar todo SQL novo em `supabase/schema.sql`.
+- Mudanças no banco: SQL Editor do Supabase no Chrome do Xande (não no navegador embutido do app Claude, que não tem login no Supabase). Se o Chrome cair na tela de login, o Xande clica em "Continue with GitHub" (conta `alexandresette`); o Claude não faz esse login sozinho. Funciona setar o editor com `window.monaco.editor.getModels()[0].setValue(sql)` e clicar em Run. Registrar todo SQL novo em `supabase/schema.sql`.
 - Testar telas com dados falsos: copiar o `index.html`, trocar o supabase-js por um mock e rodar no Playwright (Chromium em `/opt/pw-browsers`).
 
 ## 7. Decisões e aprendizados (não repetir erros)
@@ -145,7 +145,7 @@ Observações de ambiente (aprendidas):
 
 Formato: data · versão · o que mudou · por quê. Mais recente em cima.
 
-- 02/11/2026 · v=24 · Comentários nas fotos de treino dos amigos: balão com contagem e prévia no mural, tela `#/foto/<id>` com a conversa, editar/apagar o próprio. Tabela nova `checkin_comments`. Pedido do Xande.
+- 02/11/2026 · v=24 · Comentários nas fotos de treino dos amigos: balão com contagem e prévia no mural, tela `#/foto/<id>` com a conversa, editar/apagar o próprio. Tabela nova `checkin_comments` (SQL rodado no mesmo dia). Pedido do Xande.
 - 02/11/2026 · v=23 · Editar e apagar o próprio comentário (conversa da leitura e mural). Apagar leva as curtidas junto (cascade). Pedido do Xande.
 - 02/11/2026 · v=22 · Apagar a própria foto de treino do dia pra trocar (tela do treino, segundo toque confirma, só hoje e ontem). Pedido do Xande.
 - 21/10/2026 · v=21 · Pódio do ranking: colocação (1º, 2º, 3º) grande em cima e pontuação menor embaixo, pedido do Xande. Rodapé corrigido pro desempate atual (quem chegou primeiro na pontuação).
